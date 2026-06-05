@@ -1,0 +1,215 @@
+// pnpm --filter @roo-code/core test src/custom-tools/__tests__/custom-tool-registry.spec.ts
+
+import { type CustomToolDefinition, parametersSchema as z } from "@roo-code/types"
+
+import { CustomToolRegistry } from "../custom-tool-registry.js"
+
+describe("CustomToolRegistry", () => {
+	let registry: CustomToolRegistry
+
+	beforeEach(() => {
+		registry = new CustomToolRegistry()
+	})
+
+	describe("validation", () => {
+		it("should accept a valid tool definition", () => {
+			const validTool = {
+				name: "valid_tool",
+				description: "A valid tool",
+				parameters: z.object({ name: z.string() }),
+				execute: async () => "result",
+			}
+
+			expect(() => registry.register(validTool)).not.toThrow()
+			expect(registry.has("valid_tool")).toBe(true)
+		})
+
+		it("should reject empty description", () => {
+			const invalidTool = {
+				name: "invalid_tool",
+				description: "",
+				parameters: z.object({}),
+				execute: async () => "result",
+			}
+
+			expect(() => registry.register(invalidTool as CustomToolDefinition)).toThrow(/Invalid tool definition/)
+		})
+
+		it("should reject non-Zod parameters", () => {
+			const invalidTool = {
+				name: "bad_params_tool",
+				description: "Tool with bad params",
+				parameters: { foo: "bar" },
+				execute: async () => "result",
+			}
+
+			expect(() => registry.register(invalidTool as unknown as CustomToolDefinition)).toThrow(
+				/Invalid tool definition/,
+			)
+		})
+
+		it("should allow missing parameters", () => {
+			const toolWithoutParams = {
+				name: "no_params_tool",
+				description: "Tool without parameters",
+				execute: async () => "result",
+			}
+
+			expect(() => registry.register(toolWithoutParams)).not.toThrow()
+			expect(registry.has("no_params_tool")).toBe(true)
+		})
+
+		it("should reject empty name", () => {
+			const invalidTool = {
+				name: "",
+				description: "Tool with empty name",
+				execute: async () => "result",
+			}
+
+			expect(() => registry.register(invalidTool as CustomToolDefinition)).toThrow(/Invalid tool definition/)
+		})
+
+		it("should reject missing name", () => {
+			const invalidTool = {
+				description: "Tool without name",
+				execute: async () => "result",
+			}
+
+			expect(() => registry.register(invalidTool as unknown as CustomToolDefinition)).toThrow(
+				/Invalid tool definition/,
+			)
+		})
+	})
+
+	describe("register", () => {
+		it("should register a valid tool", () => {
+			const tool: CustomToolDefinition = {
+				name: "test_tool",
+				description: "Test tool",
+				parameters: z.object({ input: z.string() }),
+				execute: async (args: { input: string }) => `Processed: ${args.input}`,
+			}
+
+			registry.register(tool)
+
+			expect(registry.has("test_tool")).toBe(true)
+			expect(registry.size).toBe(1)
+		})
+
+		it("should throw for invalid tool definition", () => {
+			const invalidTool = {
+				name: "bad_tool",
+				description: "",
+				execute: async () => "result",
+			}
+
+			expect(() => registry.register(invalidTool as CustomToolDefinition)).toThrow(/Invalid tool definition/)
+		})
+
+		it("should overwrite existing tool with same id", () => {
+			const tool1: CustomToolDefinition = {
+				name: "tool",
+				description: "First version",
+				execute: async () => "v1",
+			}
+
+			const tool2: CustomToolDefinition = {
+				name: "tool",
+				description: "Second version",
+				execute: async () => "v2",
+			}
+
+			registry.register(tool1)
+			registry.register(tool2)
+
+			expect(registry.size).toBe(1)
+			expect(registry.get("tool")?.description).toBe("Second version")
+		})
+	})
+
+	describe("unregister", () => {
+		it("should remove a registered tool", () => {
+			registry.register({
+				name: "tool",
+				description: "Test",
+				execute: async () => "result",
+			})
+
+			const result = registry.unregister("tool")
+
+			expect(result).toBe(true)
+			expect(registry.has("tool")).toBe(false)
+		})
+
+		it("should return false for non-existent tool", () => {
+			const result = registry.unregister("nonexistent")
+			expect(result).toBe(false)
+		})
+	})
+
+	describe("get", () => {
+		it("should return registered tool", () => {
+			registry.register({
+				name: "my_tool",
+				description: "My tool",
+				execute: async () => "result",
+			})
+
+			const tool = registry.get("my_tool")
+
+			expect(tool).toBeDefined()
+			expect(tool?.name).toBe("my_tool")
+			expect(tool?.description).toBe("My tool")
+		})
+
+		it("should return undefined for non-existent tool", () => {
+			expect(registry.get("nonexistent")).toBeUndefined()
+		})
+	})
+
+	describe("list", () => {
+		it("should return all tool IDs", () => {
+			registry.register({ name: "tool_a", description: "A", execute: async () => "a" })
+			registry.register({ name: "tool_b", description: "B", execute: async () => "b" })
+			registry.register({ name: "tool_c", description: "C", execute: async () => "c" })
+
+			const ids = registry.list()
+
+			expect(ids).toHaveLength(3)
+			expect(ids).toContain("tool_a")
+			expect(ids).toContain("tool_b")
+			expect(ids).toContain("tool_c")
+		})
+
+		it("should return empty array when no tools registered", () => {
+			expect(registry.list()).toEqual([])
+		})
+	})
+
+	describe("getAll", () => {
+		it("should return all tools as array", () => {
+			registry.register({ name: "tool1", description: "Tool 1", execute: async () => "1" })
+			registry.register({ name: "tool2", description: "Tool 2", execute: async () => "2" })
+
+			const all = registry.getAll()
+
+			expect(all).toHaveLength(2)
+			expect(all.find((t) => t.name === "tool1")?.description).toBe("Tool 1")
+			expect(all.find((t) => t.name === "tool2")?.description).toBe("Tool 2")
+		})
+	})
+
+	describe("clear", () => {
+		it("should remove all registered tools", () => {
+			registry.register({ name: "tool1", description: "1", execute: async () => "1" })
+			registry.register({ name: "tool2", description: "2", execute: async () => "2" })
+
+			expect(registry.size).toBe(2)
+
+			registry.clear()
+
+			expect(registry.size).toBe(0)
+			expect(registry.list()).toEqual([])
+		})
+	})
+})
