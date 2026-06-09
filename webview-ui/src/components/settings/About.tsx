@@ -37,7 +37,7 @@ export const About = ({ telemetrySetting, setTelemetrySetting, debug, setDebug, 
 						? `Version: ${Package.version} (${Package.sha.slice(0, 8)})`
 						: `Version: ${Package.version}`}
 				</p>
-				<SearchableSetting
+				{/* <SearchableSetting
 					settingId="about-telemetry"
 					section="about"
 					label={t("settings:footer.telemetry.label")}>
@@ -57,7 +57,7 @@ export const About = ({ telemetrySetting, setTelemetrySetting, debug, setDebug, 
 							}}
 						/>
 					</p>
-				</SearchableSetting>
+				</SearchableSetting> */}
 			</Section>
 
 			<Section className="space-y-0">
