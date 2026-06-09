@@ -2,8 +2,8 @@
 	"name": "zoo-code",
 	"displayName": "%extension.displayName%",
 	"description": "%extension.description%",
-	"publisher": "ZooCodeOrganization",
-	"version": "3.56.0",
+	"publisher": "aiengineer",
+	"version": "3.56.0-1",
 	"icon": "assets/icons/icon.png",
 	"galleryBanner": {
 		"color": "#617A91",
@@ -14,7 +14,7 @@
 		"node": "20.20.2"
 	},
 	"author": {
-		"name": "Zoo Code"
+		"name": "Zoo Code for AI Engineer"
 	},
 	"repository": {
 		"type": "git",
