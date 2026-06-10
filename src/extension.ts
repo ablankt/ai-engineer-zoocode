@@ -49,8 +49,10 @@ import {
 	CodeActionProvider,
 } from "./activate"
 import { initializeI18n } from "./i18n"
-import { initializeModelCacheRefresh } from "./api/providers/fetchers/modelCache"
+// import { initializeModelCacheRefresh } from "./api/providers/fetchers/modelCache"
 import { initZooCodeAuth } from "./services/zoo-code-auth"
+import { isNewerVersion } from "./utils/methods"
+import nodeFetch from "node-fetch"
 
 /**
  * Built using https://github.com/microsoft/vscode-webview-ui-toolkit
@@ -120,6 +122,11 @@ async function checkWorktreeAutoOpen(
 // This method is called when your extension is activated.
 // Your extension is activated the very first time the command is executed.
 export async function activate(context: vscode.ExtensionContext) {
+	let APP_VERSION = "unknown"
+	if (context.extension && context.extension.packageJSON && context.extension.packageJSON.version) {
+		APP_VERSION = context.extension.packageJSON.version
+	}
+
 	extensionContext = context
 	outputChannel = vscode.window.createOutputChannel(Package.outputChannel)
 	context.subscriptions.push(outputChannel)
@@ -357,6 +364,95 @@ export async function activate(context: vscode.ExtensionContext) {
 	// Initialize background model cache refresh
 	// FOR AIE: Commented to prevent call to providers that work without API Key
 	//initializeModelCacheRefresh()
+
+	// FOR AIE : Auto update mechanism
+	// TODO: Update URL to Zoo Code once it's been deployed on plugin proxy
+	// Uncomment once plugin proxy is ready
+	// const infoURL = "https://plugins.dev.aie.ai.t-systems.net/v1/registry/434185/packages/latest/info"
+	// const downloadURL = "https://plugins.dev.aie.ai.t-systems.net/v1/registry/434185/packages/latest/download"
+
+	// nodeFetch(infoURL)
+	// 	//@ts-ignore
+	// 	.then(async (manifest_response) => {
+	// 		const manifest_json: any = await manifest_response.json()
+
+	// 		const downloadVersionRaw = manifest_json.package_version
+	// 		//Regex to extract version-number to compare with package.json version, it just filters out the -aie suffix from version
+	// 		const versionMatch = downloadVersionRaw.match(/^\d+\.\d+\.\d+(?:-\d+)?/)
+	// 		const DOWNLOAD_VERSION = versionMatch ? versionMatch[0] : null
+
+	// 		if (!DOWNLOAD_VERSION) {
+	// 			throw new Error(
+	// 				"Download version on AIFS plugin proxy for Zoo Code is incorrectly formatted, try again!",
+	// 			)
+	// 		}
+
+	// 		if (isNewerVersion(DOWNLOAD_VERSION, APP_VERSION)) {
+	// 			const filename = `zoo-code-${DOWNLOAD_VERSION}.vsix`
+	// 			const vsixPath: string = path.join(__dirname, filename)
+	// 			console.log("Zoo Code vsixPath: ", vsixPath)
+
+	// 			vscode.window
+	// 				.showInformationMessage(
+	// 					`Zoo Code version ${DOWNLOAD_VERSION} is available. Do you want to update now?`,
+	// 					"Yes",
+	// 					"Later",
+	// 				)
+	// 				.then((choice) => {
+	// 					if (choice === "Yes") {
+	// 						nodeFetch(downloadURL)
+	// 							//@ts-ignore
+	// 							.then(async (response) => {
+	// 								if (response.status == 200) {
+	// 									const fileStream = fs.createWriteStream(vsixPath)
+	// 									//@ts-ignore
+	// 									response.body.pipe(fileStream)
+
+	// 									return new Promise((resolve, reject) => {
+	// 										//@ts-ignore
+	// 										response.body.on("error", reject)
+	// 										fileStream.on("finish", () => resolve(vsixPath))
+	// 									})
+	// 								} else {
+	// 									let err = await response.json()
+	// 									console.log("Writing file failed for Zoo code: ", err)
+	// 									throw "response body error Zoo Code write: " + err
+	// 								}
+	// 							})
+	// 							.then(() => {
+	// 								//@ts-ignore
+	// 								vscode.commands.executeCommand(
+	// 									"workbench.extensions.installExtension",
+	// 									vscode.Uri.file(vsixPath),
+	// 								)
+	// 								vscode.window.showInformationMessage("Zoo Code extension updated successfully.")
+
+	// 								vscode.window
+	// 									.showInformationMessage(
+	// 										"Zoo Code extension updated successfully. Restart to apply changes?",
+	// 										"Restart Now",
+	// 										"Later",
+	// 									)
+	// 									.then((choice) => {
+	// 										//@ts-ignore
+	// 										if (choice === "Restart Now") {
+	// 											vscode.commands.executeCommand("workbench.action.restartExtensions")
+	// 										}
+	// 									})
+	// 							})
+	// 							.catch((error: any) => {
+	// 								vscode.window.showErrorMessage("Failed to download or install the update. for Zoo Code" + error)
+	// 							})
+	// 					}
+	// 				})
+	// 		} else {
+	// 			console.log("Current version of Zoo Code is greater than or equal to version to download!")
+	// 		}
+	// 	})
+	// 	.catch((error: any) => {
+	// 		// Show error to the user
+	// 		vscode.window.showErrorMessage("Failed to check for Zoo Code update: " + error.message)
+	// 	})
 
 	return new API(outputChannel, provider, socketPath, enableLogging)
 }
