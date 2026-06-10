@@ -355,7 +355,8 @@ export async function activate(context: vscode.ExtensionContext) {
 	}
 
 	// Initialize background model cache refresh
-	initializeModelCacheRefresh()
+	// FOR AIE: Commented to prevent call to providers that work without API Key
+	//initializeModelCacheRefresh()
 
 	return new API(outputChannel, provider, socketPath, enableLogging)
 }
