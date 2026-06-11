@@ -1,0 +1,48 @@
+name: "Setup Node.js and pnpm"
+
+description: "Sets up Node.js and pnpm with caching and installs dependencies"
+
+inputs:
+    node-version:
+        description: "Node.js version to use"
+        required: false
+        default: "20.20.2"
+    pnpm-version:
+        description: "pnpm version to use"
+        required: false
+        default: "10.8.1"
+    skip-install:
+        description: "Skip dependency installation"
+        required: false
+        default: "false"
+    install-args:
+        description: "Additional arguments for pnpm install"
+        required: false
+        default: ""
+
+runs:
+    using: "composite"
+    steps:
+        - name: Install pnpm
+          uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+          with:
+              version: ${{ inputs.pnpm-version }}
+        - name: Get pnpm store directory
+          shell: bash
+          run: |
+              echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+        - name: Setup pnpm cache
+          uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+          with:
+              path: ${{ env.STORE_PATH }}
+              key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+              restore-keys: |
+                  ${{ runner.os }}-pnpm-store-
+        - name: Setup Node.js
+          uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+          with:
+              node-version: ${{ inputs.node-version }}
+        - name: Install dependencies
+          if: ${{ inputs.skip-install != 'true' }}
+          shell: bash
+          run: pnpm install ${{ inputs.install-args }}

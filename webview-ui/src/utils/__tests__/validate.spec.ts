@@ -1,0 +1,398 @@
+import type { ProviderSettings, OrganizationAllowList, RouterModels } from "@roo-code/types"
+
+// Mock i18next to return translation keys with interpolated values
+vi.mock("i18next", () => ({
+	default: {
+		t: (key: string, options?: Record<string, string>) => {
+			if (options) {
+				let result = key
+				Object.entries(options).forEach(([k, v]) => {
+					result += ` ${k}=${v}`
+				})
+				return result
+			}
+			return key
+		},
+	},
+}))
+
+import {
+	getModelValidationError,
+	validateApiConfiguration,
+	validateApiConfigurationExcludingModelErrors,
+	validateBedrockArn,
+} from "../validate"
+
+describe("Model Validation Functions", () => {
+	const mockRouterModels: RouterModels = {
+		openrouter: {
+			"valid-model": {
+				maxTokens: 8192,
+				contextWindow: 200000,
+				supportsImages: true,
+				supportsPromptCache: false,
+				inputPrice: 3.0,
+				outputPrice: 15.0,
+			},
+			"another-valid-model": {
+				maxTokens: 4096,
+				contextWindow: 100000,
+				supportsImages: false,
+				supportsPromptCache: false,
+				inputPrice: 1.0,
+				outputPrice: 5.0,
+			},
+		},
+		requesty: {},
+		unbound: {},
+		litellm: {},
+		ollama: {},
+		lmstudio: {},
+		"vercel-ai-gateway": {},
+		poe: {},
+		deepseek: {},
+		"opencode-go": {},
+		"zoo-gateway": {},
+	}
+
+	const allowAllOrganization: OrganizationAllowList = {
+		allowAll: true,
+		providers: {},
+	}
+
+	const restrictiveOrganization: OrganizationAllowList = {
+		allowAll: false,
+		providers: {
+			openrouter: {
+				allowAll: false,
+				models: ["valid-model"],
+			},
+		},
+	}
+
+	describe("getModelValidationError", () => {
+		it("returns undefined for valid OpenRouter model", () => {
+			const config: ProviderSettings = {
+				apiProvider: "openrouter",
+				openRouterModelId: "valid-model",
+			}
+
+			const result = getModelValidationError(config, mockRouterModels, allowAllOrganization)
+			expect(result).toBeUndefined()
+		})
+
+		it("returns error for invalid OpenRouter model", () => {
+			const config: ProviderSettings = {
+				apiProvider: "openrouter",
+				openRouterModelId: "invalid-model",
+			}
+
+			const result = getModelValidationError(config, mockRouterModels, allowAllOrganization)
+			expect(result).toContain("settings:validation.modelAvailability")
+		})
+
+		it("returns error for model not allowed by organization", () => {
+			const config: ProviderSettings = {
+				apiProvider: "openrouter",
+				openRouterModelId: "another-valid-model",
+			}
+
+			const result = getModelValidationError(config, mockRouterModels, restrictiveOrganization)
+			expect(result).toContain("model")
+		})
+
+		it("returns undefined for OpenAI models when no router models provided", () => {
+			const config: ProviderSettings = {
+				apiProvider: "openai",
+				openAiModelId: "gpt-4",
+			}
+
+			const result = getModelValidationError(config, undefined, allowAllOrganization)
+			expect(result).toBeUndefined()
+		})
+
+		it("handles empty model IDs gracefully", () => {
+			const config: ProviderSettings = {
+				apiProvider: "openrouter",
+				openRouterModelId: "",
+			}
+
+			const result = getModelValidationError(config, mockRouterModels, allowAllOrganization)
+			expect(result).toBe("settings:validation.modelId")
+		})
+
+		it("handles undefined model IDs gracefully", () => {
+			const config: ProviderSettings = {
+				apiProvider: "openrouter",
+				// openRouterModelId is undefined
+			}
+
+			const result = getModelValidationError(config, mockRouterModels, allowAllOrganization)
+			expect(result).toBe("settings:validation.modelId")
+		})
+	})
+
+	describe("validateApiConfigurationExcludingModelErrors", () => {
+		it("returns undefined when configuration is valid", () => {
+			const config: ProviderSettings = {
+				apiProvider: "openrouter",
+				openRouterApiKey: "valid-key",
+				openRouterModelId: "valid-model",
+			}
+
+			const result = validateApiConfigurationExcludingModelErrors(config, mockRouterModels, allowAllOrganization)
+			expect(result).toBeUndefined()
+		})
+
+		it("returns error for missing API key", () => {
+			const config: ProviderSettings = {
+				apiProvider: "openrouter",
+				openRouterModelId: "valid-model",
+				// Missing openRouterApiKey
+			}
+
+			const result = validateApiConfigurationExcludingModelErrors(config, mockRouterModels, allowAllOrganization)
+			expect(result).toBe("settings:validation.apiKey")
+		})
+
+		it("excludes model-specific errors", () => {
+			const config: ProviderSettings = {
+				apiProvider: "openrouter",
+				openRouterApiKey: "valid-key",
+				openRouterModelId: "invalid-model", // This should be ignored
+			}
+
+			const result = validateApiConfigurationExcludingModelErrors(config, mockRouterModels, allowAllOrganization)
+			expect(result).toBeUndefined() // Should not return model validation error
+		})
+
+		it("excludes model-specific organization errors", () => {
+			const config: ProviderSettings = {
+				apiProvider: "openrouter",
+				openRouterApiKey: "valid-key",
+				openRouterModelId: "another-valid-model", // Not allowed by restrictive org
+			}
+
+			const result = validateApiConfigurationExcludingModelErrors(
+				config,
+				mockRouterModels,
+				restrictiveOrganization,
+			)
+			expect(result).toBeUndefined() // Should exclude model-specific org errors
+		})
+	})
+
+	describe("Opencode Go validation", () => {
+		it("returns an apiKey error when the Opencode Go API key is missing", () => {
+			const config: ProviderSettings = {
+				apiProvider: "opencode-go",
+				opencodeGoModelId: "glm-5.1",
+				// Missing opencodeGoApiKey
+			}
+
+			const result = validateApiConfigurationExcludingModelErrors(config, mockRouterModels, allowAllOrganization)
+			expect(result).toBe("settings:validation.apiKey")
+		})
+
+		it("returns undefined for a valid Opencode Go configuration", () => {
+			const config: ProviderSettings = {
+				apiProvider: "opencode-go",
+				opencodeGoApiKey: "valid-key",
+				opencodeGoModelId: "glm-5.1",
+			}
+
+			const result = validateApiConfigurationExcludingModelErrors(config, mockRouterModels, allowAllOrganization)
+			expect(result).toBeUndefined()
+		})
+
+		it("returns a modelId error when no Opencode Go model id is set", () => {
+			const config: ProviderSettings = {
+				apiProvider: "opencode-go",
+				opencodeGoApiKey: "valid-key",
+				// Missing opencodeGoModelId
+			}
+
+			const result = getModelValidationError(config, mockRouterModels, allowAllOrganization)
+			expect(result).toBe("settings:validation.modelId")
+		})
+	})
+
+	describe("Zoo Gateway validation", () => {
+		describe("validateApiConfiguration (welcome-view entry point)", () => {
+			it("returns a sign-in error when neither profile token nor Zoo auth is present", () => {
+				const config: ProviderSettings = {
+					apiProvider: "zoo-gateway",
+					zooGatewayModelId: "anthropic/claude-sonnet-4",
+				}
+
+				const result = validateApiConfiguration(config, mockRouterModels, allowAllOrganization, false)
+				expect(result).toBe("settings:validation.zooGatewaySignIn")
+			})
+
+			it("returns undefined when Zoo Code auth is active without a profile token", () => {
+				const config: ProviderSettings = {
+					apiProvider: "zoo-gateway",
+					zooGatewayModelId: "anthropic/claude-sonnet-4",
+				}
+
+				const result = validateApiConfiguration(config, mockRouterModels, allowAllOrganization, true)
+				expect(result).toBeUndefined()
+			})
+
+			it("returns undefined when a profile session token is set", () => {
+				const config: ProviderSettings = {
+					apiProvider: "zoo-gateway",
+					zooGatewayModelId: "anthropic/claude-sonnet-4",
+					zooSessionToken: "zoo_ext_test_token",
+				}
+
+				const result = validateApiConfiguration(config, mockRouterModels, allowAllOrganization, false)
+				expect(result).toBeUndefined()
+			})
+		})
+
+		describe("validateApiConfigurationExcludingModelErrors (settings form)", () => {
+			// The settings form short-circuits zoo-gateway and renders the sign-in
+			// error inline in `ZooGateway.tsx`, so this entry point must never
+			// surface a zoo-gateway-specific error regardless of auth state.
+			it("returns undefined for zoo-gateway when unauthenticated and no token", () => {
+				const config: ProviderSettings = {
+					apiProvider: "zoo-gateway",
+					zooGatewayModelId: "anthropic/claude-sonnet-4",
+				}
+
+				const result = validateApiConfigurationExcludingModelErrors(
+					config,
+					mockRouterModels,
+					allowAllOrganization,
+				)
+				expect(result).toBeUndefined()
+			})
+
+			it("returns undefined for zoo-gateway when a profile token is set", () => {
+				const config: ProviderSettings = {
+					apiProvider: "zoo-gateway",
+					zooGatewayModelId: "anthropic/claude-sonnet-4",
+					zooSessionToken: "zoo_ext_test_token",
+				}
+
+				const result = validateApiConfigurationExcludingModelErrors(
+					config,
+					mockRouterModels,
+					allowAllOrganization,
+				)
+				expect(result).toBeUndefined()
+			})
+
+			it("surfaces PROVIDER_NOT_ALLOWED for zoo-gateway when organization disallows it", () => {
+				const orgWithoutZooGateway: OrganizationAllowList = {
+					allowAll: false,
+					providers: {
+						openrouter: { allowAll: true },
+					},
+				}
+
+				const config: ProviderSettings = {
+					apiProvider: "zoo-gateway",
+					zooGatewayModelId: "anthropic/claude-sonnet-4",
+				}
+
+				const result = validateApiConfigurationExcludingModelErrors(
+					config,
+					mockRouterModels,
+					orgWithoutZooGateway,
+				)
+				expect(result).toContain("settings:validation.providerNotAllowed")
+			})
+		})
+	})
+})
+
+describe("validateBedrockArn", () => {
+	describe("always returns isValid: true (no strict format validation)", () => {
+		it("accepts standard AWS Bedrock ARNs", () => {
+			const result = validateBedrockArn(
+				"arn:aws:bedrock:us-west-2:123456789012:inference-profile/us.anthropic.claude-3-5-sonnet-v2",
+			)
+			expect(result.isValid).toBe(true)
+			expect(result.arnRegion).toBe("us-west-2")
+			expect(result.errorMessage).toBeUndefined()
+		})
+
+		it("accepts AWS GovCloud ARNs", () => {
+			const result = validateBedrockArn(
+				"arn:aws-us-gov:bedrock:us-gov-west-1:123456789012:inference-profile/model",
+			)
+			expect(result.isValid).toBe(true)
+			expect(result.arnRegion).toBe("us-gov-west-1")
+			expect(result.errorMessage).toBeUndefined()
+		})
+
+		it("accepts AWS China ARNs", () => {
+			const result = validateBedrockArn("arn:aws-cn:bedrock:cn-north-1:123456789012:inference-profile/model")
+			expect(result.isValid).toBe(true)
+			expect(result.arnRegion).toBe("cn-north-1")
+			expect(result.errorMessage).toBeUndefined()
+		})
+
+		it("accepts SageMaker ARNs", () => {
+			const result = validateBedrockArn("arn:aws:sagemaker:us-east-1:123456789012:endpoint/my-endpoint")
+			expect(result.isValid).toBe(true)
+			expect(result.arnRegion).toBe("us-east-1")
+			expect(result.errorMessage).toBeUndefined()
+		})
+
+		it("accepts non-standard ARN formats without validation errors", () => {
+			// Users are advanced - trust their input
+			const result = validateBedrockArn("arn:custom:service:region:account:resource")
+			expect(result.isValid).toBe(true)
+			expect(result.arnRegion).toBe("region")
+			expect(result.errorMessage).toBeUndefined()
+		})
+
+		it("accepts completely custom ARN strings", () => {
+			// Even unusual formats should be accepted
+			const result = validateBedrockArn("some-custom-arn-format")
+			expect(result.isValid).toBe(true)
+			// May not be able to extract region from non-standard format
+			expect(result.errorMessage).toBeUndefined()
+		})
+	})
+
+	describe("region mismatch warnings", () => {
+		it("shows warning when ARN region differs from provided region", () => {
+			const result = validateBedrockArn(
+				"arn:aws:bedrock:us-west-2:123456789012:inference-profile/model",
+				"us-east-1",
+			)
+			expect(result.isValid).toBe(true) // Still valid, just a warning
+			expect(result.arnRegion).toBe("us-west-2")
+			expect(result.errorMessage).toBeDefined()
+			expect(result.errorMessage).toContain("us-west-2")
+		})
+
+		it("shows no warning when ARN region matches provided region", () => {
+			const result = validateBedrockArn(
+				"arn:aws:bedrock:us-west-2:123456789012:inference-profile/model",
+				"us-west-2",
+			)
+			expect(result.isValid).toBe(true)
+			expect(result.arnRegion).toBe("us-west-2")
+			expect(result.errorMessage).toBeUndefined()
+		})
+
+		it("shows no warning when no region is provided to check against", () => {
+			const result = validateBedrockArn("arn:aws:bedrock:us-west-2:123456789012:inference-profile/model")
+			expect(result.isValid).toBe(true)
+			expect(result.arnRegion).toBe("us-west-2")
+			expect(result.errorMessage).toBeUndefined()
+		})
+
+		it("shows no warning when region cannot be extracted from ARN", () => {
+			const result = validateBedrockArn("non-arn-format", "us-east-1")
+			expect(result.isValid).toBe(true)
+			expect(result.arnRegion).toBeUndefined()
+			expect(result.errorMessage).toBeUndefined()
+		})
+	})
+})
