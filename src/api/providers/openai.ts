@@ -569,8 +569,18 @@ export async function getOpenAiModels(baseUrl?: string, apiKey?: string, openAiH
 			config["headers"] = headers
 		}
 
-		const response = await axios.get(`${trimmedBaseUrl}/models`, config)
-		const modelsArray = response.data?.data?.map((model: any) => model.id) || []
+		// AIE adjustment to load models
+		let url = ""
+		if (trimmedBaseUrl.endsWith("/")) url = trimmedBaseUrl + "models"
+		else url = trimmedBaseUrl + "/models"
+
+		const response = await fetch(url, config)
+		let json_res: any = await response.json()
+		let modelsArray = []
+		// AIE chat proxy returned models with .name property where as AIFS returns model with .id property, this change ensures models show up with chat as well as plugin proxy
+		if (trimmedBaseUrl.includes("aie")) modelsArray = json_res.map((model: any) => model.name) || []
+		else modelsArray = json_res.data.map((model: any) => model.id) || []
+
 		return [...new Set<string>(modelsArray)]
 	} catch (error) {
 		return []
