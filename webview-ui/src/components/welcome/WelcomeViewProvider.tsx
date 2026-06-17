@@ -16,8 +16,8 @@ import { Tab, TabContent } from "../common/Tab"
 import RooHero from "./RooHero"
 
 const DEFAULT_WELCOME_API_CONFIGURATION: ProviderSettings = {
-	apiProvider: "openrouter",
-	openRouterModelId: openRouterDefaultModelId,
+	apiProvider: "openai",
+	// Optionally add other OpenAI-compatible fields here, e.g. apiModelId
 }
 
 const getWelcomeApiConfiguration = (
