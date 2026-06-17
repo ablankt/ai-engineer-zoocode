@@ -154,12 +154,12 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 		allowedMaxRequests,
 		allowedMaxCost,
 		language,
-		alwaysAllowExecute,
+		// alwaysAllowExecute,
 		alwaysAllowMcp,
 		alwaysAllowModeSwitch,
 		alwaysAllowSubtasks,
 		alwaysAllowWrite,
-		alwaysAllowWriteOutsideWorkspace,
+		// alwaysAllowWriteOutsideWorkspace,
 		alwaysAllowWriteProtected,
 		autoCondenseContext,
 		autoCondenseContextPercent,
@@ -369,9 +369,11 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 					alwaysAllowReadOnly: alwaysAllowReadOnly ?? undefined,
 					alwaysAllowReadOnlyOutsideWorkspace: alwaysAllowReadOnlyOutsideWorkspace ?? undefined,
 					alwaysAllowWrite: alwaysAllowWrite ?? undefined,
-					alwaysAllowWriteOutsideWorkspace: alwaysAllowWriteOutsideWorkspace ?? undefined,
+					// alwaysAllowWriteOutsideWorkspace: alwaysAllowWriteOutsideWorkspace ?? undefined,
+					alwaysAllowWriteOutsideWorkspace: false,
 					alwaysAllowWriteProtected: alwaysAllowWriteProtected ?? undefined,
-					alwaysAllowExecute: alwaysAllowExecute ?? undefined,
+					// alwaysAllowExecute: alwaysAllowExecute ?? undefined,
+					alwaysAllowExecute: false,
 					alwaysAllowMcp,
 					alwaysAllowModeSwitch,
 					allowedCommands: allowedCommands ?? [],
@@ -787,18 +789,18 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 								alwaysAllowReadOnly={alwaysAllowReadOnly}
 								alwaysAllowReadOnlyOutsideWorkspace={alwaysAllowReadOnlyOutsideWorkspace}
 								alwaysAllowWrite={alwaysAllowWrite}
-								alwaysAllowWriteOutsideWorkspace={alwaysAllowWriteOutsideWorkspace}
+								// alwaysAllowWriteOutsideWorkspace={alwaysAllowWriteOutsideWorkspace}
 								alwaysAllowWriteProtected={alwaysAllowWriteProtected}
 								alwaysAllowMcp={alwaysAllowMcp}
 								alwaysAllowModeSwitch={alwaysAllowModeSwitch}
 								alwaysAllowSubtasks={alwaysAllowSubtasks}
-								alwaysAllowExecute={alwaysAllowExecute}
+								// alwaysAllowExecute={alwaysAllowExecute}
 								alwaysAllowFollowupQuestions={alwaysAllowFollowupQuestions}
 								followupAutoApproveTimeoutMs={followupAutoApproveTimeoutMs}
-								allowedCommands={allowedCommands}
+								// allowedCommands={allowedCommands}
 								allowedMaxRequests={allowedMaxRequests ?? undefined}
 								allowedMaxCost={allowedMaxCost ?? undefined}
-								deniedCommands={deniedCommands}
+								// deniedCommands={deniedCommands}
 								setCachedStateField={setCachedStateField}
 							/>
 						)}
