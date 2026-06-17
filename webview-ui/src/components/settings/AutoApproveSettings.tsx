@@ -1,12 +1,12 @@
-import { HTMLAttributes, useState } from "react"
-import { X } from "lucide-react"
+import { HTMLAttributes } from "react"
+// import { X } from "lucide-react"
 import { Trans } from "react-i18next"
 import { Package } from "@roo/package"
 
 import { useAppTranslation } from "@/i18n/TranslationContext"
 import { VSCodeCheckbox } from "@vscode/webview-ui-toolkit/react"
 import { vscode } from "@/utils/vscode"
-import { Button, Input, Slider } from "@/components/ui"
+import { Slider } from "@/components/ui"
 
 import { SetCachedStateField } from "./types"
 import { SectionHeader } from "./SectionHeader"
@@ -22,34 +22,34 @@ type AutoApproveSettingsProps = HTMLAttributes<HTMLDivElement> & {
 	alwaysAllowReadOnly?: boolean
 	alwaysAllowReadOnlyOutsideWorkspace?: boolean
 	alwaysAllowWrite?: boolean
-	alwaysAllowWriteOutsideWorkspace?: boolean
+	// alwaysAllowWriteOutsideWorkspace?: boolean
 	alwaysAllowWriteProtected?: boolean
 	alwaysAllowMcp?: boolean
 	alwaysAllowModeSwitch?: boolean
 	alwaysAllowSubtasks?: boolean
-	alwaysAllowExecute?: boolean
+	// alwaysAllowExecute?: boolean
 	alwaysAllowFollowupQuestions?: boolean
 	followupAutoApproveTimeoutMs?: number
-	allowedCommands?: string[]
+	// allowedCommands?: string[]
 	allowedMaxRequests?: number | undefined
 	allowedMaxCost?: number | undefined
-	deniedCommands?: string[]
+	// deniedCommands?: string[]
 	setCachedStateField: SetCachedStateField<
 		| "alwaysAllowReadOnly"
 		| "alwaysAllowReadOnlyOutsideWorkspace"
 		| "alwaysAllowWrite"
-		| "alwaysAllowWriteOutsideWorkspace"
+		// | "alwaysAllowWriteOutsideWorkspace"
 		| "alwaysAllowWriteProtected"
 		| "alwaysAllowMcp"
 		| "alwaysAllowModeSwitch"
 		| "alwaysAllowSubtasks"
-		| "alwaysAllowExecute"
+		// | "alwaysAllowExecute"
 		| "alwaysAllowFollowupQuestions"
 		| "followupAutoApproveTimeoutMs"
-		| "allowedCommands"
+		// | "allowedCommands"
 		| "allowedMaxRequests"
 		| "allowedMaxCost"
-		| "deniedCommands"
+		// | "deniedCommands"
 	>
 }
 
@@ -57,51 +57,51 @@ export const AutoApproveSettings = ({
 	alwaysAllowReadOnly,
 	alwaysAllowReadOnlyOutsideWorkspace,
 	alwaysAllowWrite,
-	alwaysAllowWriteOutsideWorkspace,
+	// alwaysAllowWriteOutsideWorkspace,
 	alwaysAllowWriteProtected,
 	alwaysAllowMcp,
 	alwaysAllowModeSwitch,
 	alwaysAllowSubtasks,
-	alwaysAllowExecute,
+	// alwaysAllowExecute,
 	alwaysAllowFollowupQuestions,
 	followupAutoApproveTimeoutMs = 60000,
-	allowedCommands,
+	// allowedCommands,
 	allowedMaxRequests,
 	allowedMaxCost,
-	deniedCommands,
+	// deniedCommands,
 	setCachedStateField,
 	...props
 }: AutoApproveSettingsProps) => {
 	const { t } = useAppTranslation()
-	const [commandInput, setCommandInput] = useState("")
-	const [deniedCommandInput, setDeniedCommandInput] = useState("")
+	// const [commandInput, setCommandInput] = useState("")
+	// const [deniedCommandInput, setDeniedCommandInput] = useState("")
 	const { autoApprovalEnabled, setAutoApprovalEnabled } = useExtensionState()
 
 	const toggles = useAutoApprovalToggles()
 
 	const { effectiveAutoApprovalEnabled } = useAutoApprovalState(toggles, autoApprovalEnabled)
 
-	const handleAddCommand = () => {
-		const currentCommands = allowedCommands ?? []
+	// const handleAddCommand = () => {
+	// 	const currentCommands = allowedCommands ?? []
 
-		if (commandInput && !currentCommands.includes(commandInput)) {
-			const newCommands = [...currentCommands, commandInput]
-			setCachedStateField("allowedCommands", newCommands)
-			setCommandInput("")
-			vscode.postMessage({ type: "updateSettings", updatedSettings: { allowedCommands: newCommands } })
-		}
-	}
+	// 	if (commandInput && !currentCommands.includes(commandInput)) {
+	// 		const newCommands = [...currentCommands, commandInput]
+	// 		setCachedStateField("allowedCommands", newCommands)
+	// 		setCommandInput("")
+	// 		vscode.postMessage({ type: "updateSettings", updatedSettings: { allowedCommands: newCommands } })
+	// 	}
+	// }
 
-	const handleAddDeniedCommand = () => {
-		const currentCommands = deniedCommands ?? []
+	// const handleAddDeniedCommand = () => {
+	// 	const currentCommands = deniedCommands ?? []
 
-		if (deniedCommandInput && !currentCommands.includes(deniedCommandInput)) {
-			const newCommands = [...currentCommands, deniedCommandInput]
-			setCachedStateField("deniedCommands", newCommands)
-			setDeniedCommandInput("")
-			vscode.postMessage({ type: "updateSettings", updatedSettings: { deniedCommands: newCommands } })
-		}
-	}
+	// 	if (deniedCommandInput && !currentCommands.includes(deniedCommandInput)) {
+	// 		const newCommands = [...currentCommands, deniedCommandInput]
+	// 		setCachedStateField("deniedCommands", newCommands)
+	// 		setDeniedCommandInput("")
+	// 		vscode.postMessage({ type: "updateSettings", updatedSettings: { deniedCommands: newCommands } })
+	// 	}
+	// }
 
 	return (
 		<div {...props}>
@@ -155,7 +155,7 @@ export const AutoApproveSettings = ({
 						alwaysAllowMcp={alwaysAllowMcp}
 						alwaysAllowModeSwitch={alwaysAllowModeSwitch}
 						alwaysAllowSubtasks={alwaysAllowSubtasks}
-						alwaysAllowExecute={alwaysAllowExecute}
+						// alwaysAllowExecute={alwaysAllowExecute}
 						alwaysAllowFollowupQuestions={alwaysAllowFollowupQuestions}
 						onToggle={(key, value) => setCachedStateField(key, value)}
 					/>
@@ -203,7 +203,7 @@ export const AutoApproveSettings = ({
 							<span className="codicon codicon-edit" />
 							<div>{t("settings:autoApprove.write.label")}</div>
 						</div>
-						<SearchableSetting
+						{/* <SearchableSetting
 							settingId="auto-approve-write-outside-workspace"
 							section="autoApprove"
 							label={t("settings:autoApprove.write.outsideWorkspace.label")}>
@@ -220,7 +220,7 @@ export const AutoApproveSettings = ({
 							<div className="text-vscode-descriptionForeground text-sm mt-1">
 								{t("settings:autoApprove.write.outsideWorkspace.description")}
 							</div>
-						</SearchableSetting>
+						</SearchableSetting> */}
 						<SearchableSetting
 							settingId="auto-approve-write-protected"
 							section="autoApprove"
@@ -270,7 +270,8 @@ export const AutoApproveSettings = ({
 					</div>
 				)}
 
-				{alwaysAllowExecute && (
+				{/** FOR AIE: Disable auto approval of terminal command execution */}
+				{/* {alwaysAllowExecute && (
 					<div className="flex flex-col gap-3 pl-3 border-l-2 border-vscode-button-background">
 						<div className="flex items-center gap-4 font-bold">
 							<span className="codicon codicon-terminal" />
@@ -331,7 +332,7 @@ export const AutoApproveSettings = ({
 							))}
 						</div>
 
-						{/* Denied Commands Section */}
+						// Denied Commands Section
 						<SearchableSetting
 							settingId="auto-approve-denied-commands"
 							section="autoApprove"
@@ -390,7 +391,7 @@ export const AutoApproveSettings = ({
 							))}
 						</div>
 					</div>
-				)}
+				)} */}
 			</Section>
 		</div>
 	)

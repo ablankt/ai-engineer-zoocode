@@ -20,7 +20,7 @@ export type AutoApprovalState =
 	| "alwaysAllowMcp"
 	| "alwaysAllowModeSwitch"
 	| "alwaysAllowSubtasks"
-	| "alwaysAllowExecute"
+	// | "alwaysAllowExecute" // Command execution auto-approval removed
 	| "alwaysAllowFollowupQuestions"
 
 // Some of these actions have additional settings associated with them.
@@ -30,9 +30,9 @@ export type AutoApprovalStateOptions =
 	| "alwaysAllowWriteOutsideWorkspace" // For `alwaysAllowWrite`.
 	| "alwaysAllowWriteProtected"
 	| "followupAutoApproveTimeoutMs" // For `alwaysAllowFollowupQuestions`.
-	| "mcpServers" // For `alwaysAllowMcp`.
-	| "allowedCommands" // For `alwaysAllowExecute`.
-	| "deniedCommands"
+	| "mcpServers" // For `alwaysAllowMcp."
+// | "allowedCommands" // For `alwaysAllowExecute`. Removed for security.
+// | "deniedCommands" // Removed for security.
 
 export type CheckAutoApprovalResult =
 	| { decision: "approve" }
@@ -112,21 +112,20 @@ export async function checkAutoApproval({
 	}
 
 	if (ask === "command") {
-		if (!text) {
-			return { decision: "ask" }
-		}
+		// if (!text) {
+		return { decision: "ask" }
+		// }
+		// if (state.alwaysAllowExecute === true) {
+		// 	const decision = getCommandDecision(text, state.allowedCommands || [], state.deniedCommands || [])
 
-		if (state.alwaysAllowExecute === true) {
-			const decision = getCommandDecision(text, state.allowedCommands || [], state.deniedCommands || [])
-
-			if (decision === "auto_approve") {
-				return { decision: "approve" }
-			} else if (decision === "auto_deny") {
-				return { decision: "deny" }
-			} else {
-				return { decision: "ask" }
-			}
-		}
+		// 	if (decision === "auto_approve") {
+		// 		return { decision: "approve" }
+		// 	} else if (decision === "auto_deny") {
+		// 		return { decision: "deny" }
+		// 	} else {
+		// 		return { decision: "ask" }
+		// 	}
+		// }
 	}
 
 	if (ask === "tool") {
