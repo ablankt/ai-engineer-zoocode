@@ -893,6 +893,28 @@ export class ClineProvider
 			await this.removeClineFromStack()
 		}
 
+		// ---Start: FOR AIE Fix:  Ensure provider profile is activated after reload/settings navigation ---
+		try {
+			const { currentApiConfigName, listApiConfigMeta } = await this.getState()
+			if (currentApiConfigName && listApiConfigMeta?.length) {
+				const profile = listApiConfigMeta.find(({ name }) => name === currentApiConfigName)
+				if (profile?.name) {
+					await this.activateProviderProfile(
+						{ name: profile.name },
+						{ persistModeConfig: false, persistTaskHistory: false },
+					)
+					// Force API handler rebuild to prevent stale config and OpenRouter popup
+					const providerSettings = this.contextProxy.getProviderSettings()
+					this.updateTaskApiHandlerIfNeeded(providerSettings, { forceRebuild: true })
+				}
+			}
+		} catch (error) {
+			this.log(
+				`[ProviderProfileReloadFix] Failed to activate provider profile after reload: ${error instanceof Error ? error.message : String(error)}`,
+			)
+		}
+		// ---End: FOR AIE Fix-------------------------------------------------------------------------------
+
 		// Ensure zoo-gateway profile is seeded for users who signed in before this feature existed.
 		// Without this, users with a valid cached token but no zoo-gateway profile would need to
 		// re-authenticate to use Zoo Gateway. Fire-and-forget to avoid blocking webview init.
@@ -1013,6 +1035,8 @@ export class ClineProvider
 
 							if (hasActualSettings) {
 								await this.activateProviderProfile({ name: profile.name })
+								// FOR AIE: Force rebuilding of API Handler to prevent stale configuration usage this is especially important to prevent open router popups.
+								this.updateTaskApiHandlerIfNeeded(profile, { forceRebuild: true })
 							} else {
 								// The task will continue with the current/default configuration.
 							}
@@ -1558,7 +1582,8 @@ export class ClineProvider
 
 				// Change the provider for the current task.
 				// TODO: We should rename `buildApiHandler` for clarity (e.g. `getProviderClient`).
-				this.updateTaskApiHandlerIfNeeded(providerSettings, { forceRebuild: true })
+				const currentProviderSettings = this.contextProxy.getProviderSettings()
+				this.updateTaskApiHandlerIfNeeded(currentProviderSettings, { forceRebuild: true })
 
 				// Keep the current task's sticky provider profile in sync with the newly-activated profile.
 				await this.persistStickyProviderProfileToCurrentTask(name)
@@ -2989,6 +3014,9 @@ export class ClineProvider
 
 			if (configuration.currentApiConfigName) {
 				await this.setProviderProfile(configuration.currentApiConfigName)
+				// FOR AIE: Force rebuilding of API Handler to prevent stale configuration usage this is especially important to prevent open router popups.
+				const providerSettings = this.contextProxy.getProviderSettings()
+				this.updateTaskApiHandlerIfNeeded(providerSettings, { forceRebuild: true })
 			}
 
 			// Register custom modes so the CustomModesManager knows about them.
