@@ -947,7 +947,25 @@ export const webviewMessageHandler = async (
 
 			const safeGetModels = async (options: GetModelsOptions): Promise<ModelRecord> => {
 				try {
-					return await getModels(options)
+					const blockedProviders = [
+						"openrouter",
+						"requesty",
+						"unbound",
+						"vercel-ai-gateway",
+						"deepinfra",
+						"roo",
+						"chutes",
+						"litellm",
+						"ollama",
+						"lmstudio",
+						"vscode-lm",
+						"huggingface",
+						"fake-ai",
+					]
+
+					if (blockedProviders.includes(options.provider))
+						throw new Error(`Provider ${options.provider} is not supported for getModels in AI Engineer`)
+					else return await getModels(options)
 				} catch (error) {
 					console.error(
 						`Failed to fetch models in webviewMessageHandler requestRouterModels for ${options.provider}:`,

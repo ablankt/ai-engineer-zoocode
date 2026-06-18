@@ -223,8 +223,8 @@ export function buildAuthorizationUrl(codeChallenge: string, state: string): str
  * Important: state must NOT be included in token exchange body
  */
 export async function exchangeCodeForTokens(code: string, codeVerifier: string): Promise<OpenAiCodexCredentials> {
-	// Per the implementation guide: use application/x-www-form-urlencoded
-	// and do NOT include state in the body (OpenAI returns error if included)
+	// [AIE] External network call disabled for compliance: always throw error.
+	/*
 	const body = new URLSearchParams({
 		grant_type: "authorization_code",
 		client_id: OPENAI_CODEX_OAUTH_CONFIG.clientId,
@@ -254,10 +254,8 @@ export async function exchangeCodeForTokens(code: string, codeVerifier: string):
 		throw new Error("Token exchange did not return a refresh_token")
 	}
 
-	// Per the implementation guide: expires is in milliseconds since epoch
 	const expiresAt = Date.now() + tokenResponse.expires_in * 1000
 
-	// Extract ChatGPT account ID from JWT claims
 	const accountId = extractAccountId({
 		id_token: tokenResponse.id_token,
 		access_token: tokenResponse.access_token,
@@ -271,6 +269,8 @@ export async function exchangeCodeForTokens(code: string, codeVerifier: string):
 		email: tokenResponse.email,
 		accountId,
 	}
+	*/
+	throw new Error("[AIE] OpenAI Codex OAuth is disabled for compliance.")
 }
 
 /**
@@ -278,6 +278,8 @@ export async function exchangeCodeForTokens(code: string, codeVerifier: string):
  * Uses application/x-www-form-urlencoded (not JSON)
  */
 export async function refreshAccessToken(credentials: OpenAiCodexCredentials): Promise<OpenAiCodexCredentials> {
+	// [AIE] External network call disabled for compliance: always throw error.
+	/*
 	const body = new URLSearchParams({
 		grant_type: "refresh_token",
 		client_id: OPENAI_CODEX_OAUTH_CONFIG.clientId,
@@ -306,10 +308,8 @@ export async function refreshAccessToken(credentials: OpenAiCodexCredentials): P
 	const data = await response.json()
 	const tokenResponse = tokenResponseSchema.parse(data)
 
-	// Per the implementation guide: expires is in milliseconds since epoch
 	const expiresAt = Date.now() + tokenResponse.expires_in * 1000
 
-	// Extract new account ID from refreshed tokens, or preserve existing one
 	const newAccountId = extractAccountId({
 		id_token: tokenResponse.id_token,
 		access_token: tokenResponse.access_token,
@@ -321,9 +321,10 @@ export async function refreshAccessToken(credentials: OpenAiCodexCredentials): P
 		refresh_token: tokenResponse.refresh_token ?? credentials.refresh_token,
 		expires: expiresAt,
 		email: tokenResponse.email ?? credentials.email,
-		// Prefer newly extracted accountId, fall back to existing
 		accountId: newAccountId ?? credentials.accountId,
 	}
+	*/
+	throw new OpenAiCodexOAuthTokenError("[AIE] OpenAI Codex OAuth is disabled for compliance.")
 }
 
 /**

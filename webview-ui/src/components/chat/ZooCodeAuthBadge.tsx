@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react"
 import { useExtensionState } from "@src/context/ExtensionStateContext"
-import { getZooCodeAuthUrl } from "@src/oauth/urls"
-import { vscode } from "@src/utils/vscode"
+// import { getZooCodeAuthUrl } from "@src/oauth/urls"
+// import { vscode } from "@src/utils/vscode"
 import { cn } from "@src/lib/utils"
 
 interface ZooCodeAuthBadgeProps {
@@ -39,9 +39,9 @@ export const ZooCodeAuthBadge: React.FC<ZooCodeAuthBadgeProps> = ({ className })
 		zooCodeUserName,
 		zooCodeUserEmail,
 		zooCodeUserImage,
-		zooCodeBaseUrl,
-		uriScheme,
-		deviceName,
+		// zooCodeBaseUrl,
+		// uriScheme,
+		// deviceName,
 	} = useExtensionState()
 	const [isOpen, setIsOpen] = useState(false)
 	const [imageError, setImageError] = useState(false)
@@ -63,19 +63,19 @@ export const ZooCodeAuthBadge: React.FC<ZooCodeAuthBadgeProps> = ({ className })
 		setImageError(false)
 	}, [zooCodeUserImage])
 
-	const authUrl = getZooCodeAuthUrl(uriScheme, zooCodeBaseUrl, deviceName)
+	// const authUrl = getZooCodeAuthUrl(uriScheme, zooCodeBaseUrl, deviceName)
 
 	const showImage = zooCodeIsAuthenticated && zooCodeUserImage && !imageError
 	const avatarColor = getAvatarColor(zooCodeUserEmail || zooCodeUserName || "ZC")
 	const avatarButtonStyle: CSSProperties | undefined =
 		zooCodeIsAuthenticated && !showImage ? { backgroundColor: avatarColor } : undefined
-	const menuItemClasses =
-		"block cursor-pointer px-3.5 py-2.5 text-[13px] no-underline text-[var(--vscode-menu-foreground)] hover:bg-[var(--vscode-menu-selectionBackground)]"
+	// const menuItemClasses =
+	// 	"block cursor-pointer px-3.5 py-2.5 text-[13px] no-underline text-[var(--vscode-menu-foreground)] hover:bg-[var(--vscode-menu-selectionBackground)]"
 
-	const handleSignOut = () => {
-		vscode.postMessage({ type: "zooCodeSignOut" })
-		setIsOpen(false)
-	}
+	// const handleSignOut = () => {
+	// 	vscode.postMessage({ type: "zooCodeSignOut" })
+	// 	setIsOpen(false)
+	// }
 
 	return (
 		<div ref={ref} className={cn("relative ml-2", className)}>
@@ -129,7 +129,7 @@ export const ZooCodeAuthBadge: React.FC<ZooCodeAuthBadgeProps> = ({ className })
 						"border border-[var(--vscode-menu-border,var(--vscode-widget-border,#3c3c3c))]",
 						"bg-[var(--vscode-menu-background)]",
 					)}>
-					{!zooCodeIsAuthenticated ? (
+					{/* {!zooCodeIsAuthenticated ? (
 						<a href={authUrl} onClick={() => setIsOpen(false)} className={menuItemClasses}>
 							Sign in to Zoo Code
 						</a>
@@ -159,7 +159,7 @@ export const ZooCodeAuthBadge: React.FC<ZooCodeAuthBadgeProps> = ({ className })
 								Sign out
 							</button>
 						</>
-					)}
+					)} */}
 				</div>
 			)}
 		</div>

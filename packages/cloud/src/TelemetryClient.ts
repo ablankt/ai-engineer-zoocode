@@ -5,7 +5,7 @@ import {
 	type AuthService,
 	type SettingsService,
 	TelemetryEventName,
-	rooCodeTelemetryEventSchema,
+	// rooCodeTelemetryEventSchema,
 	TelemetryPropertiesProvider,
 	TelemetryEventSubscription,
 } from "@roo-code/types"
@@ -78,7 +78,8 @@ abstract class BaseTelemetryClient implements TelemetryClient {
 	public abstract updateTelemetryState(didUserOptIn: boolean): void
 
 	public isTelemetryEnabled(): boolean {
-		return this.telemetryEnabled
+		//return this.telemetryEnabled
+		return false
 	}
 
 	public abstract shutdown(): Promise<void>
@@ -111,7 +112,9 @@ export class CloudTelemetryClient extends BaseTelemetryClient {
 			return
 		}
 
-		const url = `${getRooCodeApiUrl()}/api/${path}`
+		let url = `${getRooCodeApiUrl()}/api/${path}`
+		// AIE : Overwrite url to empty string to prevent any unintended calls to Roo Code wrt Telemetry
+		url = ""
 		const fetchOptions: RequestInit = {
 			...options,
 			headers: {
@@ -172,28 +175,28 @@ export class CloudTelemetryClient extends BaseTelemetryClient {
 			console.info(`[TelemetryClient#capture] ${JSON.stringify(payload)}`)
 		}
 
-		const result = rooCodeTelemetryEventSchema.safeParse(payload)
+		// const result = rooCodeTelemetryEventSchema.safeParse(payload)
 
-		if (!result.success) {
-			console.error(
-				`[TelemetryClient#capture] Invalid telemetry event: ${result.error.message} - ${JSON.stringify(payload)}`,
-			)
+		// if (!result.success) {
+		// 	console.error(
+		// 		`[TelemetryClient#capture] Invalid telemetry event: ${result.error.message} - ${JSON.stringify(payload)}`,
+		// 	)
 
-			return
-		}
+		// 	return
+		// }
 
-		try {
-			await this.fetch(`events`, {
-				method: "POST",
-				body: JSON.stringify(result.data),
-			})
-		} catch (error) {
-			console.error(`[TelemetryClient#capture] Error sending telemetry event: ${error}`)
-			// Error is already queued for retry in the fetch method
-		}
+		// try {
+		// 	await this.fetch(`events`, {
+		// 		method: "POST",
+		// 		body: JSON.stringify(result.data),
+		// 	})
+		// } catch (error) {
+		// 	console.error(`[TelemetryClient#capture] Error sending telemetry event: ${error}`)
+		// 	// Error is already queued for retry in the fetch method
+		// }
 	}
 
-	public async backfillMessages(messages: ClineMessage[], taskId: string): Promise<void> {
+	public async backfillMessages(_messages: ClineMessage[], _taskId: string): Promise<void> {
 		if (!this.isTelemetryEnabled()) {
 			return
 		}
@@ -212,53 +215,53 @@ export class CloudTelemetryClient extends BaseTelemetryClient {
 			return
 		}
 
-		try {
-			const mergedProperties = await this.getEventProperties({
-				event: TelemetryEventName.TASK_MESSAGE,
-				properties: { taskId },
-			})
+		// try {
+		// const mergedProperties = await this.getEventProperties({
+		// 	event: TelemetryEventName.TASK_MESSAGE,
+		// 	properties: { taskId },
+		// })
 
-			const formData = new FormData()
-			formData.append("taskId", taskId)
-			formData.append("properties", JSON.stringify(mergedProperties))
+		// const formData = new FormData()
+		// formData.append("taskId", taskId)
+		// formData.append("properties", JSON.stringify(mergedProperties))
 
-			formData.append(
-				"file",
-				new File([JSON.stringify(messages)], "task.json", {
-					type: "application/json",
-				}),
-			)
+		// formData.append(
+		// 	"file",
+		// 	new File([JSON.stringify(messages)], "task.json", {
+		// 		type: "application/json",
+		// 	}),
+		// )
 
-			if (this.debug) {
-				console.info(
-					`[TelemetryClient#backfillMessages] Uploading ${messages.length} messages for task ${taskId}`,
-				)
-			}
+		// if (this.debug) {
+		// 	console.info(
+		// 		`[TelemetryClient#backfillMessages] Uploading ${messages.length} messages for task ${taskId}`,
+		// 	)
+		// }
 
-			const url = `${getRooCodeApiUrl()}/api/events/backfill`
-			const fetchOptions: RequestInit = {
-				method: "POST",
-				headers: {
-					Authorization: `Bearer ${token}`,
-				},
-				body: formData,
-			}
+		// const url = `${getRooCodeApiUrl()}/api/events/backfill`
+		// const fetchOptions: RequestInit = {
+		// 	method: "POST",
+		// 	headers: {
+		// 		Authorization: `Bearer ${token}`,
+		// 	},
+		// 	body: formData,
+		// }
 
-			try {
-				const response = await fetch(url, fetchOptions)
+		// 	try {
+		// 		const response = await fetch(url, fetchOptions)
 
-				if (!response.ok) {
-					console.error(
-						`[TelemetryClient#backfillMessages] POST events/backfill -> ${response.status} ${response.statusText}`,
-					)
-				}
-			} catch (fetchError) {
-				console.error(`[TelemetryClient#backfillMessages] Network error: ${fetchError}`)
-				throw fetchError
-			}
-		} catch (error) {
-			console.error(`[TelemetryClient#backfillMessages] Error uploading messages: ${error}`)
-		}
+		// 		if (!response.ok) {
+		// 			console.error(
+		// 				`[TelemetryClient#backfillMessages] POST events/backfill -> ${response.status} ${response.statusText}`,
+		// 			)
+		// 		}
+		// 	} catch (fetchError) {
+		// 		console.error(`[TelemetryClient#backfillMessages] Network error: ${fetchError}`)
+		// 		throw fetchError
+		// 	}
+		// } catch (error) {
+		// 	console.error(`[TelemetryClient#backfillMessages] Error uploading messages: ${error}`)
+		// }
 	}
 
 	public override updateTelemetryState(_didUserOptIn: boolean) {}
@@ -268,7 +271,8 @@ export class CloudTelemetryClient extends BaseTelemetryClient {
 			return false
 		}
 
-		return true
+		// AIE: Set telemetry checks to false by default
+		return false
 	}
 
 	protected override isEventCapturable(eventName: TelemetryEventName): boolean {

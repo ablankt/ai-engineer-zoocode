@@ -2,7 +2,8 @@ import { useCallback, useState } from "react"
 import { Trans } from "react-i18next"
 import { ArrowLeft, Brain } from "lucide-react"
 
-import { openRouterDefaultModelId, type ProviderSettings } from "@roo-code/types"
+// import { openRouterDefaultModelId, type ProviderSettings } from "@roo-code/types"
+import { type ProviderSettings } from "@roo-code/types"
 
 import { useExtensionState } from "@src/context/ExtensionStateContext"
 import { validateApiConfiguration } from "@src/utils/validate"
@@ -16,8 +17,8 @@ import { Tab, TabContent } from "../common/Tab"
 import RooHero from "./RooHero"
 
 const DEFAULT_WELCOME_API_CONFIGURATION: ProviderSettings = {
-	apiProvider: "openrouter",
-	openRouterModelId: openRouterDefaultModelId,
+	apiProvider: "openai",
+	// Optionally add other OpenAI-compatible fields here, e.g. apiModelId
 }
 
 const getWelcomeApiConfiguration = (

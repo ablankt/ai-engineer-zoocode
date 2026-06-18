@@ -2,16 +2,16 @@ import { PostHog } from "posthog-node"
 import * as vscode from "vscode"
 
 import {
-	type TelemetryProperties,
+	// type TelemetryProperties,
 	type TelemetryEvent,
 	TelemetryEventName,
 	getErrorStatusCode,
 	getErrorMessage,
 	shouldReportApiErrorToTelemetry,
-	isApiProviderError,
-	extractApiProviderErrorProperties,
-	isConsecutiveMistakeError,
-	extractConsecutiveMistakeErrorProperties,
+	// isApiProviderError,
+	// extractApiProviderErrorProperties,
+	// isConsecutiveMistakeError,
+	// extractConsecutiveMistakeErrorProperties,
 } from "@roo-code/types"
 
 import { BaseTelemetryClient } from "./BaseTelemetryClient"
@@ -65,18 +65,19 @@ export class PostHogTelemetryClient extends BaseTelemetryClient {
 			console.info(`[PostHogTelemetryClient#capture] ${event.event}`)
 		}
 
-		const properties = await this.getEventProperties(event)
+		//const properties = await this.getEventProperties(event)
 
-		this.client.capture({
-			distinctId: this.distinctId,
-			event: event.event,
-			properties,
-		})
+		//AIE: Prevent capturing of Telemetry data
+		// this.client.capture({
+		// 	distinctId: this.distinctId,
+		// 	event: event.event,
+		// 	properties,
+		// })
 	}
 
 	public override async captureException(
 		error: Error,
-		additionalProperties?: Record<string, unknown>,
+		_additionalProperties?: Record<string, unknown>,
 	): Promise<void> {
 		if (!this.isTelemetryEnabled()) {
 			if (this.debug) {
@@ -106,36 +107,37 @@ export class PostHogTelemetryClient extends BaseTelemetryClient {
 
 		// Auto-extract properties from known error types and merge with additionalProperties.
 		// Explicit additionalProperties take precedence over auto-extracted properties.
-		let mergedProperties = additionalProperties
+		// let mergedProperties = additionalProperties
 
-		if (isApiProviderError(error)) {
-			const extractedProperties = extractApiProviderErrorProperties(error)
-			mergedProperties = { ...extractedProperties, ...additionalProperties }
-		} else if (isConsecutiveMistakeError(error)) {
-			const extractedProperties = extractConsecutiveMistakeErrorProperties(error)
-			mergedProperties = { ...extractedProperties, ...additionalProperties }
-		}
+		// if (isApiProviderError(error)) {
+		// 	const extractedProperties = extractApiProviderErrorProperties(error)
+		// 	mergedProperties = { ...extractedProperties, ...additionalProperties }
+		// } else if (isConsecutiveMistakeError(error)) {
+		// 	const extractedProperties = extractConsecutiveMistakeErrorProperties(error)
+		// 	mergedProperties = { ...extractedProperties, ...additionalProperties }
+		// }
 
 		// Override the error message with the extracted error message.
-		error.message = errorMessage
+		// error.message = errorMessage
 
-		const provider = this.providerRef?.deref()
-		let telemetryProperties: TelemetryProperties | undefined = undefined
+		// const provider = this.providerRef?.deref()
+		// let telemetryProperties: TelemetryProperties | undefined = undefined
 
-		if (provider) {
-			try {
-				telemetryProperties = await provider.getTelemetryProperties()
-			} catch (_error) {
-				// Ignore.
-			}
-		}
+		// if (provider) {
+		// 	try {
+		// 		telemetryProperties = await provider.getTelemetryProperties()
+		// 	} catch (_error) {
+		// 		// Ignore.
+		// 	}
+		// }
 
-		const exceptionProperties = {
-			...mergedProperties,
-			$app_version: telemetryProperties?.appVersion,
-		}
+		// const exceptionProperties = {
+		// 	...mergedProperties,
+		// 	$app_version: telemetryProperties?.appVersion,
+		// }
 
-		this.client.captureException(error, this.distinctId, exceptionProperties)
+		// AIE: Disable Telemetry
+		// this.client.captureException(error, this.distinctId, exceptionProperties)
 	}
 
 	/**
@@ -144,7 +146,7 @@ export class PostHogTelemetryClient extends BaseTelemetryClient {
 	 * user has opted in.
 	 * @param didUserOptIn Whether the user has explicitly opted into telemetry
 	 */
-	public override updateTelemetryState(didUserOptIn: boolean): void {
+	public override updateTelemetryState(_didUserOptIn: boolean): void {
 		this.telemetryEnabled = false
 
 		// First check global telemetry level - telemetry should only be enabled when level is "all".
@@ -153,12 +155,13 @@ export class PostHogTelemetryClient extends BaseTelemetryClient {
 
 		// We only enable telemetry if global vscode telemetry is enabled.
 		if (globalTelemetryEnabled) {
-			this.telemetryEnabled = didUserOptIn
+			// AIE: Disable Telemetry
+			this.telemetryEnabled = false
 		}
 
 		// Update PostHog client state based on telemetry preference.
 		if (this.telemetryEnabled) {
-			this.client.optIn()
+			this.client.optOut()
 		} else {
 			this.client.optOut()
 		}

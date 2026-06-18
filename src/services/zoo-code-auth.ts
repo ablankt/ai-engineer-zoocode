@@ -166,7 +166,8 @@ export async function handleAuthCallback(token: string): Promise<boolean> {
 		return false
 	}
 
-	// Verify token with backend before storing
+	// [AIE] External network call disabled for compliance: always fail authentication.
+	/*
 	const baseUrl = getZooCodeBaseUrl()
 	try {
 		const response = await fetch(`${baseUrl}/api/extension/auth/verify`, {
@@ -174,8 +175,6 @@ export async function handleAuthCallback(token: string): Promise<boolean> {
 			signal: AbortSignal.timeout(10_000),
 		})
 		if (!response.ok) {
-			// Treat 5xx as a transient backend issue (e.g. DB unreachable) so the
-			// user can retry sign-in instead of being told the token is bad.
 			if (response.status >= 500) {
 				vscode.window.showErrorMessage(t("common:zooAuth.errors.could_not_verify_token"))
 			} else {
@@ -192,6 +191,8 @@ export async function handleAuthCallback(token: string): Promise<boolean> {
 		vscode.window.showErrorMessage(t("common:zooAuth.errors.could_not_verify_token"))
 		return false
 	}
+	*/
+	return false
 
 	await setZooCodeToken(token)
 
@@ -215,9 +216,9 @@ export async function handleAuthCallback(token: string): Promise<boolean> {
 export async function verifyZooCodeToken(): Promise<"valid" | "invalid" | "unreachable"> {
 	const token = await getZooCodeToken()
 	if (!token) return "invalid"
-
+	// [AIE] External network call disabled for compliance: always return "invalid".
+	/*
 	const baseUrl = getZooCodeBaseUrl()
-
 	try {
 		const response = await fetch(`${baseUrl}/api/extension/auth/verify`, {
 			headers: { Authorization: `Bearer ${token}` },
@@ -236,6 +237,8 @@ export async function verifyZooCodeToken(): Promise<"valid" | "invalid" | "unrea
 	} catch {
 		return "unreachable"
 	}
+	*/
+	return "invalid"
 }
 
 export async function isZooCodeAuthenticated(): Promise<boolean> {
@@ -244,6 +247,8 @@ export async function isZooCodeAuthenticated(): Promise<boolean> {
 }
 
 export async function disconnectZooCode(): Promise<void> {
+	// [AIE] External network call disabled for compliance: skip backend revoke call.
+	/*
 	const token = await getZooCodeToken()
 	if (token) {
 		const baseUrl = getZooCodeBaseUrl()
@@ -258,6 +263,7 @@ export async function disconnectZooCode(): Promise<void> {
 			// Ignore errors during revocation
 		}
 	}
+	*/
 	await clearZooCodeToken()
 	await clearZooCodeUserInfo()
 	vscode.window.showInformationMessage(t("common:zooAuth.info.disconnected"))
