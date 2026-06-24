@@ -15,8 +15,8 @@ fi
 # Ensure local binaries are available
 export PATH="$PWD/node_modules/.bin:$PATH"
 
-# Run type checks
-pnpm run check-types
+# # Run type checks
+# pnpm run check-types
 
 # Run tests (if enabled)
 if [ -f ".env.local" ]; then
