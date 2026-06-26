@@ -100,6 +100,10 @@ compile:
 build_package:
   extends: .base_job
   stage: build
+  # The default (XS, 1 CPU / 2 GB) runner OOM-kills the vsix build (turbo builds
+  # 14 packages incl. heavy DTS/esbuild/vite steps). Use a larger runner.
+  tags:
+    - aws_run_k8s_amd64_m
   script:
     - pnpm install --frozen-lockfile
     - pnpm vsix
