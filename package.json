@@ -23,6 +23,7 @@
 		"install:vsix": "pnpm install --frozen-lockfile && pnpm clean && pnpm vsix && node scripts/install-vsix.js",
 		"install:vsix:nightly": "pnpm install --frozen-lockfile && pnpm clean && pnpm vsix:nightly && node scripts/install-vsix.js --nightly",
 		"code-server:install": "node scripts/code-server.js",
+		"postinstall": "node scripts/vendor-ripgrep.mjs",
 		"changeset:version": "cp CHANGELOG.md src/CHANGELOG.md && changeset version && cp -vf src/CHANGELOG.md .",
 		"knip": "knip --include files",
 		"npm:publish:types": "pnpm --filter @roo-code/types npm:publish"
@@ -55,9 +56,7 @@
 		]
 	},
 	"pnpm": {
-		"onlyBuiltDependencies": [
-			"@vscode/ripgrep"
-		],
+		"onlyBuiltDependencies": [],
 		"overrides": {
 			"tar-fs": ">=3.1.1",
 			"esbuild": "0.28.0",
