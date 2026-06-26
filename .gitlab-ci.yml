@@ -1,6 +1,5 @@
 stages:
   - sync
-  - compile
   - build
   - publish
 
@@ -80,21 +79,6 @@ check_new_upstream_tags:
     - if: $CI_PIPELINE_SOURCE == "schedule"
     - if: $CI_PIPELINE_SOURCE == "web" && $CI_COMMIT_BRANCH == "aie"
       when: manual
-
-
-compile:
-  stage: compile
-  extends: .base_job
-  variables:
-    NODE_OPTIONS: "--max-old-space-size=4096"
-  script:
-    - pnpm install --frozen-lockfile
-    # - pnpm test --concurrency=1
-    # - pnpm lint --concurrency=1
-    # - pnpm check-types --concurrency=1
-  rules:
-    - if: $CI_COMMIT_BRANCH == "aie"
-    - if: $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+-[0-9]+-aie$/
 
 
 build_package:
