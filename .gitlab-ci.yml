@@ -28,7 +28,7 @@ variables:
     # vendor/ripgrep/) are materialized before install. The GitLab LFS endpoint
     # is on this host, so this works even with external network blocked.
     - command -v git-lfs >/dev/null 2>&1 || (apt-get update && apt-get install -y git-lfs)
-    - git lfs install
+    - git lfs install --force
     - git lfs pull
     - corepack enable
     - corepack prepare pnpm@latest --activate
