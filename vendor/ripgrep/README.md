@@ -14,9 +14,10 @@ with HTTP 403. To keep `pnpm install` hermetic:
   binary for the current platform/arch from here into the installed
   `@vscode/ripgrep` package's `bin/` directory.
 
-The binaries are tracked with **Git LFS** (see `.gitattributes`). LFS objects are
-served by the GitLab host itself, so they are reachable from CI even without
-external network access.
+The binaries are committed **directly to git** (not Git LFS): a plain
+`git clone` materializes them in CI without needing `git-lfs` installed or any
+external network access (installing git-lfs and fetching LFS objects proved
+unreliable in the locked-down runners).
 
 ## Current version
 
@@ -59,4 +60,4 @@ curl -sSL -o /tmp/rg-win.zip \
 unzip -oj /tmp/rg-win.zip rg.exe -d vendor/ripgrep/x86_64-pc-windows-msvc/
 ```
 
-Then commit the updated binaries (they will go through Git LFS automatically).
+Then commit the updated binaries directly (they are intentionally not in LFS).

@@ -24,12 +24,6 @@ variables:
   image: node:22
   before_script:
     - node -v
-    # Ensure Git LFS objects (e.g. the vendored ripgrep binaries under
-    # vendor/ripgrep/) are materialized before install. The GitLab LFS endpoint
-    # is on this host, so this works even with external network blocked.
-    - command -v git-lfs >/dev/null 2>&1 || (apt-get update && apt-get install -y git-lfs)
-    - git lfs install --force
-    - git lfs pull
     - corepack enable
     - corepack prepare pnpm@latest --activate
     - pnpm --version
