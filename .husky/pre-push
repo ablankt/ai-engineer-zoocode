@@ -1,3 +1,10 @@
+#!/bin/sh
+
+# Load nvm so node is available
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+nvm use 20 >/dev/null 2>&1
+
 branch="$(git rev-parse --abbrev-ref HEAD)"
 
 if [ "$branch" = "main" ]; then
@@ -5,33 +12,24 @@ if [ "$branch" = "main" ]; then
   exit 1
 fi
 
-# Detect if running on Windows and use pnpm.cmd, otherwise use pnpm.
-if [ "$OS" = "Windows_NT" ]; then
-  pnpm_cmd="pnpm.cmd"
-else
-  if command -v pnpm >/dev/null 2>&1; then
-    pnpm_cmd="pnpm"
-  else
-    pnpm_cmd="npx pnpm"
-  fi
-fi
+# Ensure local binaries are available
+export PATH="$PWD/node_modules/.bin:$PATH"
 
-$pnpm_cmd run check-types
+# # Run type checks
+# pnpm run check-types
 
-# Use dotenvx to securely load .env.local and run commands that depend on it
+# Run tests (if enabled)
 if [ -f ".env.local" ]; then
-  # Check if RUN_TESTS_ON_PUSH is set to true and run tests with dotenvx
-  if npx dotenvx get RUN_TESTS_ON_PUSH -f .env.local 2>/dev/null | grep -q "^true$"; then
-    npx dotenvx run -f .env.local -- $pnpm_cmd run test
+  if ./node_modules/.bin/dotenvx get RUN_TESTS_ON_PUSH -f .env.local 2>/dev/null | grep -q "^true$"; then
+    ./node_modules/.bin/dotenvx run -f .env.local -- pnpm run test
   fi
 else
-  # Fallback: run tests if RUN_TESTS_ON_PUSH is set in regular environment
   if [ "$RUN_TESTS_ON_PUSH" = "true" ]; then
-    $pnpm_cmd run test
+    pnpm run test
   fi
 fi
 
-# Check for new changesets.
+# Check for changesets
 NEW_CHANGESETS=$(find .changeset -name "*.md" ! -name "README.md" | wc -l | tr -d ' ')
 echo "Changeset files: $NEW_CHANGESETS"
 

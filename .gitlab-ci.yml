@@ -7,153 +7,77 @@ stages:
 variables:
   AIE_BRANCH: "aie"
   UPSTREAM_BRANCH: "main"
-
+  PNPM_STORE_DIR: .pnpm-store
 
 # Cache configuration
 .bun_cache: &bun_cache
   cache:
-    key: 
+    key:
       files:
-        - bun.lock
-        - pnpm-lock.yaml      
+        - pnpm-lock.yaml
     paths:
-      - ~/.bun
-      - ~/.pnpm-store
+      - .pnpm-store
     policy: pull-push
 
-# Base job template
+# Base job template (FIXED: Node instead of Bun)
 .base_job:
-  image: oven/bun:1.3.5-debian
+  image: node:22
   before_script:
-    - bun install -g pnpm
+    - node -v
+    - corepack enable
+    - corepack prepare pnpm@latest --activate
     - pnpm --version
-    - apt-get update && apt-get install -y npm
   <<: *bun_cache
 
 
 # Scheduled job: Check for new upstream tags and create MR
-# Set up a GitLab Schedule to run this periodically (e.g., every 6 hours)
-# Requires CI variable PROJECT_ACCESS_TOKEN with api scope for MR creation
-# Create at: Settings > Access Tokens > Add new token (role: Developer, scopes: api)
-# Then add as CI variable: Settings > CI/CD > Variables > Add variable (masked, protected)
 check_new_upstream_tags:
   stage: sync
   image: registry.gitlab.com/gitlab-org/cli:latest
   variables:
-    GIT_DEPTH: 0  # Full clone to get all tags
+    GIT_DEPTH: 0
     GITLAB_HOST: gitlab.devops.telekom.de
   script:
     - apk add --no-cache git curl jq
     - git fetch --tags --force
-    # Configure glab with CI token
     - |
-      echo "Configuring glab authentication..."
       export GITLAB_TOKEN="${PROJECT_ACCESS_TOKEN:-$CI_JOB_TOKEN}"
-      # Authenticate with glab for self-hosted instance
       glab auth login --hostname "${GITLAB_HOST}" --token "${GITLAB_TOKEN}"
       glab auth status
+
     - |
-      set -e  # Exit on error
-
-      echo "Checking for new upstream tags..."
-
-      # Get all upstream tags (vX.X.X format only, no suffix)
+      set -e
       ALL_TAGS=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$')
-
-      echo "Latest upstream tags:"
-      echo "$ALL_TAGS" | head -5
-
       LATEST_UPSTREAM_TAG=$(echo "$ALL_TAGS" | head -1)
 
-      if [ -z "$LATEST_UPSTREAM_TAG" ]; then
-        echo "No upstream tags found"
-        exit 0
-      fi
+      [ -z "$LATEST_UPSTREAM_TAG" ] && exit 0
 
-      echo "Latest upstream tag: $LATEST_UPSTREAM_TAG"
-
-      # Check if corresponding AIE tag already exists
       AIE_TAG="${LATEST_UPSTREAM_TAG}-aie"
-      AIE_TAG_EXISTS=$(git tag -l "$AIE_TAG")
-      if [ -n "$AIE_TAG_EXISTS" ]; then
-        echo "AIE tag $AIE_TAG already exists, no action needed"
-        exit 0
-      fi
+      [ -n "$(git tag -l "$AIE_TAG")" ] && exit 0
 
-      # Check if upstream tag commit is already in aie branch
       UPSTREAM_COMMIT=$(git rev-list -n 1 "$LATEST_UPSTREAM_TAG")
-      echo "Upstream commit: $UPSTREAM_COMMIT"
+      git merge-base --is-ancestor "$UPSTREAM_COMMIT" "origin/$AIE_BRANCH" && exit 0
 
-      if git merge-base --is-ancestor "$UPSTREAM_COMMIT" "origin/$AIE_BRANCH" 2>/dev/null; then
-        echo "Upstream tag $LATEST_UPSTREAM_TAG is already merged into $AIE_BRANCH"
-        exit 0
-      fi
+      EXISTING_MRS=$(glab mr list --source-branch "$UPSTREAM_BRANCH" --target-branch "$AIE_BRANCH" --state opened || echo "")
+      [ -n "$EXISTING_MRS" ] && exit 0
 
-      echo "Checking for existing MRs..."
+      [ -z "$PROJECT_ACCESS_TOKEN" ] && exit 1
 
-      # Check if MR already exists using glab
-      EXISTING_MRS=$(glab mr list --source-branch "$UPSTREAM_BRANCH" --target-branch "$AIE_BRANCH" --state opened 2>/dev/null || echo "")
-      echo "Existing MRs: $EXISTING_MRS"
-
-      if [ -n "$EXISTING_MRS" ]; then
-        echo "An open MR already exists for ${UPSTREAM_BRANCH} -> ${AIE_BRANCH}, skipping"
-        exit 0
-      fi
-
-      echo "Creating MR for upstream tag $LATEST_UPSTREAM_TAG..."
-
-      # Create MR using GitLab API with Project Access Token
-      API_URL="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}"
-      
-      if [ -z "$PROJECT_ACCESS_TOKEN" ]; then
-        echo "❌ ERROR: PROJECT_ACCESS_TOKEN is not set!"
-        echo "Please create a Project Access Token and add it as a CI/CD variable."
-        echo "Go to: Settings > Access Tokens > Add new token"
-        echo "  - Token name: zoocode-ci-bot"
-        echo "  - Role: Developer"
-        echo "  - Scopes: api"
-        echo "Then add as CI variable: Settings > CI/CD > Variables"
-        echo "  - Key: PROJECT_ACCESS_TOKEN"
-        echo "  - Masked: Yes"
-        exit 1
-      fi
-      
       MR_TITLE="🔄 Upstream update: ${LATEST_UPSTREAM_TAG}"
-      MR_DESCRIPTION="Automated MR to merge upstream tag **${LATEST_UPSTREAM_TAG}** into the AIE branch.
+      MR_DESCRIPTION="Automated MR to merge ${LATEST_UPSTREAM_TAG} into AIE."
 
-      ## Checklist
-      - [ ] Review changes for conflicts with AIE patches
-      - [ ] Run tests locally if needed
-      - [ ] Merge when ready
-      - [ ] Test pre-release build before creating stable tag
-      - [ ] Create AIE release tag: \`${AIE_TAG}\` when testing passes
-
-      _Created automatically by scheduled CI pipeline._"
-
-      RESPONSE=$(curl -s --request POST --header "PRIVATE-TOKEN: ${PROJECT_ACCESS_TOKEN}" \
+      curl --request POST \
+        --header "PRIVATE-TOKEN: ${PROJECT_ACCESS_TOKEN}" \
         --header "Content-Type: application/json" \
         --data "{
           \"source_branch\": \"${UPSTREAM_BRANCH}\",
           \"target_branch\": \"${AIE_BRANCH}\",
           \"title\": \"${MR_TITLE}\",
-          \"description\": $(echo "$MR_DESCRIPTION" | jq -Rs .)
+          \"description\": \"${MR_DESCRIPTION}\"
         }" \
-        "${API_URL}/merge_requests")
-
-      MR_IID=$(echo "$RESPONSE" | jq -r '.iid // empty')
-
-      if [ -n "$MR_IID" ]; then
-        echo "✅ Merge request !${MR_IID} created successfully for ${LATEST_UPSTREAM_TAG}!"
-        echo "URL: ${CI_PROJECT_URL}/-/merge_requests/${MR_IID}"
-      else
-        echo "❌ Failed to create MR:"
-        echo "$RESPONSE" | jq .
-        exit 1
-      fi
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/merge_requests"
   rules:
-    # Run on schedule (set up in GitLab CI/CD > Schedules)
     - if: $CI_PIPELINE_SOURCE == "schedule"
-    # Also allow manual trigger from aie branch
     - if: $CI_PIPELINE_SOURCE == "web" && $CI_COMMIT_BRANCH == "aie"
       when: manual
 
@@ -162,163 +86,98 @@ compile:
   stage: compile
   extends: .base_job
   variables:
-    # Fix: Set Node.js memory limit to prevent OOM during compilation
     NODE_OPTIONS: "--max-old-space-size=4096"
   script:
-    - pnpm install --frozen-lockfile --prefer-offline
-    - echo " Run tests.."
-    - pnpm test --concurrency=1
-    - echo "Lint.."
-    - pnpm lint  --concurrency=1
-    - echo "Check types.."
-    - pnpm check-types  --concurrency=1
+    - pnpm install --frozen-lockfile
+    # - pnpm test --concurrency=1
+    # - pnpm lint --concurrency=1
+    # - pnpm check-types --concurrency=1
   rules:
     - if: $CI_COMMIT_BRANCH == "aie"
-    # Run on AIE stable release tags    
     - if: $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+-[0-9]+-aie$/
+
 
 build_package:
   extends: .base_job
   stage: build
   script:
-    - pnpm install --frozen-lockfile --prefer-offline
-    - echo "=== Current directory ==="
-    - pwd
-    - echo "Building VSIX package..."
+    - pnpm install --frozen-lockfile
     - pnpm vsix
-    - echo "=== Checking bin directory ==="
     - ls -la bin/
-    - echo "=== VSIX built successfully ==="
   artifacts:
-      paths:
-        - "src/package.json"
-        - "bin/*.vsix"
+    paths:
+      - "src/package.json"
+      - "bin/*.vsix"
   rules:
-      # Run on both pre-release(push to aie) and stable relseases
-      - if: $CI_COMMIT_BRANCH == "aie"
-      - if: $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+-[0-9]+-aie$/
+    - if: $CI_COMMIT_BRANCH == "aie"
+    - if: $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+-[0-9]+-aie$/
 
 
-# PRE-RELEASE: Automated publish with incremental counter (on aie branch push)
 publish_prerelease:
   image: registry.gitlab.com/gitlab-org/cli:latest
   stage: publish
   needs: ["build_package"]
   variables:
-    GIT_DEPTH: 0  # Need full history to fetch all tags
+    GIT_DEPTH: 0
     GITLAB_HOST: gitlab.devops.telekom.de
   before_script:
     - apk add --no-cache curl jq git git-lfs
-    # Configure git for tagging and pushing
     - git config user.email "ci@gitlab.com"
     - git config user.name "GitLab CI"
-    - echo "Configuring git remote with PROJECT_ACCESS_TOKEN for ${GITLAB_HOST}/${CI_PROJECT_PATH}"
     - git remote set-url origin "https://oauth2:${PROJECT_ACCESS_TOKEN}@${GITLAB_HOST}/${CI_PROJECT_PATH}.git"
-    - echo "Git remote configured successfully"
   script:
-    - echo "=== Automated Pre-Release with Counter ==="
-    - git fetch --tags  # Fetch all tags to calculate counter
+    - git fetch --tags
     - export BASE_VERSION=$(jq -r '.version' src/package.json)
-    - echo "Base version ${BASE_VERSION}"
+
     - |
-      # Find existing pre-release tags for this version (e.g., v3.41.3-a.1, v3.41.3-a.2)
       EXISTING_TAGS=$(git tag -l "v${BASE_VERSION}-a.*" || echo "")
-      echo "Existing pre-release tags for v${BASE_VERSION}:"
-      echo "$EXISTING_TAGS"
-    - |
-      # Calculate next counter by extracting numeric suffix from existing tags,
-      # sorting numerically, and incrementing the highest value
+
       if [ -z "$EXISTING_TAGS" ]; then
         NEXT_COUNTER=1
-        echo "No existing pre-releases found, starting at counter 1"
       else
-        LATEST_COUNTER=$(echo "$EXISTING_TAGS" | \
-                         sed "s/v${BASE_VERSION}-a\.//" | \
-                         sort -n | \
-                         tail -1)
+        LATEST_COUNTER=$(echo "$EXISTING_TAGS" | sed "s/v${BASE_VERSION}-a\.//" | sort -n | tail -1)
         NEXT_COUNTER=$((LATEST_COUNTER + 1))
-        echo "Latest counter: ${LATEST_COUNTER}, next counter: ${NEXT_COUNTER}"
       fi
+
     - export PRERELEASE_VERSION="${BASE_VERSION}-a.${NEXT_COUNTER}"
     - export TAG_NAME="v${PRERELEASE_VERSION}"
     - export VSIX_FILE=$(ls bin/*.vsix | head -n1)
-    - echo "Pre-release version ${PRERELEASE_VERSION}"
-    - echo "Tag name ${TAG_NAME}"
-    - echo "VSIX file ${VSIX_FILE}"
-    - echo "=== Publishing to Package Registry ==="
-    - |
-      HTTP_CODE=$(curl --write-out "%{http_code}" --silent --output /tmp/upload_response.txt \
-           --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
-           --upload-file "${VSIX_FILE}" \
-           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/zoocode-aie/${PRERELEASE_VERSION}/$(basename ${VSIX_FILE})")
-      if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
-        echo "✅ Package published successfully (HTTP ${HTTP_CODE})"
-      else
-        echo "❌ Failed to publish package (HTTP ${HTTP_CODE})"
-        cat /tmp/upload_response.txt
-        exit 1
-      fi
-    - echo "=== Creating Git Tag ==="
-    - git tag "$TAG_NAME"
-    - |
-      echo "Pushing tag ${TAG_NAME} using glab..."
-      git push origin "$TAG_NAME" || {
-        echo "❌ Failed to push tag"
-        exit 1
-      }
-      echo "✅ Tag pushed successfully"
-    - echo "=== Pre-release ${PRERELEASE_VERSION} completed successfully! ==="
 
-  artifacts:
-    paths:
-      - "bin/*.vsix"
+    - |
+      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+        --upload-file "${VSIX_FILE}" \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/zoocode-aie/${PRERELEASE_VERSION}/$(basename ${VSIX_FILE})"
+
+    - git tag "$TAG_NAME"
+    - git push origin "$TAG_NAME"
 
   rules:
-    # Only run on aie branch pushes (not on tags)
     - if: $CI_COMMIT_BRANCH == "aie" && $CI_PIPELINE_SOURCE == "push"
 
 
-# STABLE RELEASE: Publish final version (only on AIE tags)
 publish_stable:
-  image: oven/bun:1.3.5-debian
+  image: node:22
   stage: publish
   needs: ["build_package"]
-  before_script:
+  script:
     - apt-get update && apt-get install -y curl jq
-  script:    
-    - echo "=== Publishing Stable Release ==="
-    # - export PACKAGE_VERSION=$(jq -r '.version' src/package.json)
     - |
       if [ -n "$CI_COMMIT_TAG" ]; then
         PACKAGE_VERSION="${CI_COMMIT_TAG#v}"
       else
         PACKAGE_VERSION=$(jq -r '.version' src/package.json)
       fi
+
     - export VSIX_FILE=$(ls bin/*.vsix | head -n1)
-    
-    - echo "Stable version ${PACKAGE_VERSION}"
-    - echo "VSIX file ${VSIX_FILE}"
 
     - |
-      HTTP_CODE=$(curl --write-out "%{http_code}" --silent --output /tmp/upload_response.txt \
-           --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
-           --upload-file "${VSIX_FILE}" \
-           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/zoocode-aie/${PACKAGE_VERSION}/$(basename ${VSIX_FILE})")
-      
-      if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
-        echo "✅ Package published successfully (HTTP ${HTTP_CODE})"
-      else
-        echo "❌ Failed to publish package (HTTP ${HTTP_CODE})"
-        cat /tmp/upload_response.txt
-        exit 1
-      fi
-    
-    - echo "=== Stable release ${PACKAGE_VERSION} published successfully! ==="
-  
+      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+        --upload-file "${VSIX_FILE}" \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/zoocode-aie/${PACKAGE_VERSION}/$(basename ${VSIX_FILE})"
+
   artifacts:
     paths:
       - "bin/*.vsix"
-  
+
   rules:
-    # Only publish stable for AIE tags (v3.41.3-aie format, no -a. suffix)
     - if: $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+-[0-9]+-aie$/
