@@ -17,5 +17,8 @@ webview-ui/src/i18n/locales/** linguist-generated=true
 src/i18n/locales/en/** linguist-generated=false
 webview-ui/src/i18n/locales/en/** linguist-generated=false
 # This approach uses gitattributes' last-match-wins rule to exclude English while including all other locales
-vendor/ripgrep/**/rg filter=lfs diff=lfs merge=lfs -text
-vendor/ripgrep/**/rg.exe filter=lfs diff=lfs merge=lfs -text
+
+# Vendored ripgrep binaries are committed directly (not via LFS) so a plain
+# `git clone` materializes them in CI without needing git-lfs installed.
+vendor/ripgrep/**/rg -text
+vendor/ripgrep/**/rg.exe -text
