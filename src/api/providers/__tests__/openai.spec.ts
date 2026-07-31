@@ -453,6 +453,27 @@ describe("OpenAiHandler", () => {
 			expect(callArgs.reasoning_effort).toBe("high")
 		})
 
+		it("should pass through max reasoning_effort when configured by an OpenAI-compatible model", async () => {
+			const reasoningOptions: ApiHandlerOptions = {
+				...mockOptions,
+				enableReasoningEffort: true,
+				openAiCustomModelInfo: {
+					contextWindow: 128_000,
+					supportsPromptCache: false,
+					supportsReasoningEffort: ["low", "medium", "high", "xhigh", "max"],
+					reasoningEffort: "max",
+				},
+			}
+			const reasoningHandler = new OpenAiHandler(reasoningOptions)
+			const stream = reasoningHandler.createMessage(systemPrompt, messages)
+			for await (const _chunk of stream) {
+			}
+
+			expect(mockCreate).toHaveBeenCalled()
+			const callArgs = mockCreate.mock.calls[0][0]
+			expect(callArgs.reasoning_effort).toBe("max")
+		})
+
 		it("should not include reasoning_effort when reasoning effort is disabled", async () => {
 			const noReasoningOptions: ApiHandlerOptions = {
 				...mockOptions,
@@ -903,6 +924,12 @@ describe("OpenAiHandler", () => {
 		it("should handle API errors", async () => {
 			mockCreate.mockRejectedValueOnce(new Error("API Error"))
 			await expect(handler.completePrompt("Test prompt")).rejects.toThrow("OpenAI completion error: API Error")
+		})
+
+		it("should preserve HTTP status when wrapping completion errors", async () => {
+			mockCreate.mockRejectedValueOnce(Object.assign(new Error("Unauthorized"), { status: 401 }))
+
+			await expect(handler.completePrompt("Test prompt")).rejects.toMatchObject({ status: 401 })
 		})
 
 		it("should handle empty response", async () => {
