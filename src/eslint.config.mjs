@@ -5,10 +5,12 @@ export default [
 	...config,
 	{
 		rules: {
+			"prefer-const": ["error", { destructuring: "all" }],
+
 			// TODO: The rules listed below should be re-enabled once their existing violations are fixed.
+			"no-regex-spaces": "off",
 			"no-useless-escape": "off",
 			"no-empty": "off",
-			"prefer-const": "off",
 
 			"@typescript-eslint/no-unused-vars": "off",
 			"@typescript-eslint/no-explicit-any": "off",
@@ -31,7 +33,7 @@ export default [
 	{
 		// Ratchet: enforce no-floating-promises directory by directory. Each
 		// directory is added here once its floating promises are resolved.
-		files: ["activate/**/*.ts"],
+		files: ["activate/**/*.ts", "core/task/**/*.ts"],
 		languageOptions: {
 			parserOptions: {
 				project: true,

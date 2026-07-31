@@ -43,17 +43,33 @@ vi.mock("../diagnosticsHandler", () => ({
 	generateErrorDiagnostics: vi.fn().mockResolvedValue({ success: true, filePath: "/tmp/diagnostics.json" }),
 }))
 
+vi.mock("../rulesMessageHandler", () => ({
+	handleRequestRules: vi.fn(),
+	handleCreateRule: vi.fn(),
+	handleDeleteRule: vi.fn(),
+	handleOpenRuleFile: vi.fn(),
+	handleOpenRulesDirectory: vi.fn(),
+}))
+
 import type { ModelRecord } from "@roo-code/types"
 
 import { webviewMessageHandler } from "../webviewMessageHandler"
 import type { ClineProvider } from "../ClineProvider"
-import { getModels } from "../../../api/providers/fetchers/modelCache"
+import { flushModels, getModels } from "../../../api/providers/fetchers/modelCache"
 import { getLMStudioModels } from "../../../api/providers/fetchers/lmstudio"
 import { getCommands } from "../../../services/command/commands"
+import {
+	handleCreateRule,
+	handleDeleteRule,
+	handleOpenRuleFile,
+	handleOpenRulesDirectory,
+	handleRequestRules,
+} from "../rulesMessageHandler"
 const { openAiCodexOAuthManager } = await import("../../../integrations/openai-codex/oauth")
 const { fetchOpenAiCodexRateLimitInfo } = await import("../../../integrations/openai-codex/rate-limits")
 
 const mockGetModels = getModels as Mock<typeof getModels>
+const mockFlushModels = flushModels as Mock<typeof flushModels>
 const mockGetLMStudioModels = getLMStudioModels as Mock<typeof getLMStudioModels>
 const mockGetCommands = vi.mocked(getCommands)
 const mockGetAccessToken = vi.mocked(openAiCodexOAuthManager.getAccessToken)
@@ -366,6 +382,10 @@ describe("webviewMessageHandler - requestRouterModels", () => {
 			apiKey: "litellm-key",
 			baseUrl: "http://localhost:4000",
 		})
+		// Opencode Go's /models endpoint is public, so it is fetched like the other no-auth routers.
+		expect(mockGetModels).toHaveBeenCalledWith(expect.objectContaining({ provider: "opencode-go" }))
+		// Kenari's /models endpoint is public, so it is fetched like the other no-auth routers.
+		expect(mockGetModels).toHaveBeenCalledWith(expect.objectContaining({ provider: "kenari" }))
 
 		// Verify response was sent
 		expect(mockClineProvider.postMessageToWebview).toHaveBeenCalledWith({
@@ -381,9 +401,107 @@ describe("webviewMessageHandler - requestRouterModels", () => {
 				lmstudio: {},
 				poe: {},
 				deepseek: {},
-				"opencode-go": {},
+				"opencode-go": mockModels,
+				kenari: mockModels,
 			},
 			values: undefined,
+		})
+	})
+
+	it("fetches Opencode Go models without an API key (public /models endpoint, regression for empty picker)", async () => {
+		mockClineProvider.getState = vi.fn().mockResolvedValue({
+			apiConfiguration: {
+				openRouterApiKey: "openrouter-key",
+				// Deliberately no opencodeGoApiKey — the endpoint is public.
+			},
+		})
+
+		const mockModels: ModelRecord = {
+			"glm-5.1": {
+				maxTokens: 4096,
+				contextWindow: 8192,
+				supportsPromptCache: false,
+				description: "GLM 5.1",
+			},
+		}
+		mockGetModels.mockResolvedValue(mockModels)
+
+		await webviewMessageHandler(mockClineProvider, { type: "requestRouterModels" })
+
+		// Must be fetched despite no configured key, forwarding apiKey: undefined.
+		expect(mockGetModels).toHaveBeenCalledWith({ provider: "opencode-go", apiKey: undefined })
+
+		const routerModelsCall = (mockClineProvider.postMessageToWebview as any).mock.calls.find(
+			([msg]: [{ type: string }]) => msg.type === "routerModels",
+		)
+		expect(routerModelsCall?.[0].routerModels["opencode-go"]).toEqual(mockModels)
+	})
+
+	it("flushes and fetches Opencode Go models when an explicit API key is supplied", async () => {
+		mockClineProvider.getState = vi.fn().mockResolvedValue({
+			apiConfiguration: {},
+		})
+		mockGetModels.mockResolvedValue({
+			"opencode/model": {
+				maxTokens: 4096,
+				contextWindow: 8192,
+				supportsPromptCache: false,
+				description: "Opencode model",
+			},
+		})
+
+		await webviewMessageHandler(mockClineProvider, {
+			type: "requestRouterModels",
+			values: {
+				provider: "opencode-go",
+				opencodeGoApiKey: "fresh-key",
+			},
+		})
+
+		expect(mockFlushModels).toHaveBeenCalledWith({ provider: "opencode-go", apiKey: "fresh-key" }, true)
+		expect(mockGetModels).toHaveBeenCalledWith({ provider: "opencode-go", apiKey: "fresh-key" })
+		expect(mockClineProvider.postMessageToWebview).toHaveBeenCalledWith({
+			type: "routerModels",
+			routerModels: {
+				"opencode-go": {
+					"opencode/model": expect.objectContaining({ description: "Opencode model" }),
+				},
+			},
+			values: { provider: "opencode-go" },
+		})
+	})
+
+	it("flushes and fetches Kenari models when an explicit API key is supplied", async () => {
+		mockClineProvider.getState = vi.fn().mockResolvedValue({
+			apiConfiguration: {},
+		})
+		mockGetModels.mockResolvedValue({
+			"glm-5-2": {
+				maxTokens: 32768,
+				contextWindow: 1048576,
+				supportsPromptCache: false,
+				description: "Kenari model",
+			},
+		})
+
+		await webviewMessageHandler(mockClineProvider, {
+			type: "requestRouterModels",
+			values: {
+				provider: "kenari",
+				kenariApiKey: "fresh-kenari-key",
+			},
+		})
+
+		expect(mockFlushModels).toHaveBeenCalledWith({ provider: "kenari", apiKey: "fresh-kenari-key" }, true)
+		expect(mockGetModels).toHaveBeenCalledWith({ provider: "kenari", apiKey: "fresh-kenari-key" })
+		expect(mockClineProvider.postMessageToWebview).toHaveBeenCalledWith({
+			type: "routerModels",
+			routerModels: {
+				kenari: {
+					"glm-5-2": expect.objectContaining({ description: "Kenari model" }),
+				},
+			},
+			values: { provider: "kenari" },
 		})
 	})
 
@@ -469,7 +587,8 @@ describe("webviewMessageHandler - requestRouterModels", () => {
 				lmstudio: {},
 				poe: {},
 				deepseek: {},
-				"opencode-go": {},
+				"opencode-go": mockModels,
+				kenari: mockModels,
 			},
 			values: undefined,
 		})
@@ -493,6 +612,7 @@ describe("webviewMessageHandler - requestRouterModels", () => {
 			.mockResolvedValueOnce(mockModels) // vercel-ai-gateway
 			.mockResolvedValueOnce(mockModels) // zoo-gateway
 			.mockRejectedValueOnce(new Error("LiteLLM connection failed")) // litellm
+			.mockResolvedValueOnce(mockModels) // opencode-go
 
 		await webviewMessageHandler(mockClineProvider, {
 			type: "requestRouterModels",
@@ -527,7 +647,8 @@ describe("webviewMessageHandler - requestRouterModels", () => {
 				lmstudio: {},
 				poe: {},
 				deepseek: {},
-				"opencode-go": {},
+				"opencode-go": mockModels,
+				kenari: mockModels,
 			},
 			values: undefined,
 		})
@@ -597,7 +718,7 @@ describe("webviewMessageHandler - requestRouterModels", () => {
 		})
 	})
 
-	it("prefers config values over message values for LiteLLM", async () => {
+	it("prefers message values over config values for LiteLLM", async () => {
 		const mockModels: ModelRecord = {}
 		mockGetModels.mockResolvedValue(mockModels)
 
@@ -609,11 +730,11 @@ describe("webviewMessageHandler - requestRouterModels", () => {
 			},
 		})
 
-		// Verify config values are used over message values
+		// Verify message values take precedence over saved config (current unsaved field state wins)
 		expect(mockGetModels).toHaveBeenCalledWith({
 			provider: "litellm",
-			apiKey: "litellm-key", // From config
-			baseUrl: "http://localhost:4000", // From config
+			apiKey: "message-key", // From message.values
+			baseUrl: "http://message-url", // From message.values
 		})
 	})
 })
@@ -1173,6 +1294,45 @@ describe("webviewMessageHandler - requestCommands", () => {
 				},
 			],
 		})
+	})
+})
+
+describe("webviewMessageHandler - rules", () => {
+	beforeEach(() => {
+		vi.clearAllMocks()
+		vi.mocked(mockClineProvider.getCurrentTask).mockReturnValue(undefined)
+		;(mockClineProvider as any).cwd = "/mock/workspace"
+	})
+
+	it("routes rules management messages with the current workspace", async () => {
+		const messages = [
+			{ type: "requestRules" },
+			{ type: "createRule", values: { scope: "project", kind: "generic", fileName: "new.md" } },
+			{ type: "deleteRule", values: { scope: "project", kind: "generic", relativePath: "old.md" } },
+			{ type: "openRuleFile", values: { scope: "global", kind: "generic", relativePath: "global.md" } },
+			{ type: "openRulesDirectory", values: { scope: "project", kind: "mode", modeSlug: "code" } },
+		] as const
+
+		for (const message of messages) {
+			await webviewMessageHandler(mockClineProvider, message as any)
+		}
+
+		expect(handleRequestRules).toHaveBeenCalledWith(mockClineProvider, "/mock/workspace")
+		expect(handleCreateRule).toHaveBeenCalledWith(mockClineProvider, "/mock/workspace", messages[1])
+		expect(handleDeleteRule).toHaveBeenCalledWith(mockClineProvider, "/mock/workspace", messages[2])
+		expect(handleOpenRuleFile).toHaveBeenCalledWith(mockClineProvider, "/mock/workspace", messages[3])
+		expect(handleOpenRulesDirectory).toHaveBeenCalledWith(mockClineProvider, "/mock/workspace", messages[4])
+	})
+
+	it("uses the active task cwd when routing rule messages", async () => {
+		vi.mocked(mockClineProvider.getCurrentTask).mockReturnValue({
+			cwd: "/mock/task-workspace",
+		} as unknown as ReturnType<ClineProvider["getCurrentTask"]>)
+
+		const message = { type: "requestRules" } as const
+		await webviewMessageHandler(mockClineProvider, message as any)
+
+		expect(handleRequestRules).toHaveBeenCalledWith(mockClineProvider, "/mock/task-workspace")
 	})
 })
 

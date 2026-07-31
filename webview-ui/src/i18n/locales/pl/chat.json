@@ -40,6 +40,14 @@
 		"title": "Rozpocznij nowe zadanie",
 		"tooltip": "Rozpocznij nowe zadanie"
 	},
+	"seeNewChanges": {
+		"title": "Zobacz nowe zmiany",
+		"tooltip": "Wyświetl zmiany wprowadzone od twojego ostatniego promptu"
+	},
+	"restoreChanges": {
+		"title": "Przywróć zmiany",
+		"tooltip": "Przywróć pliki i stan zadania do twojego ostatniego promptu"
+	},
 	"proceedAnyways": {
 		"title": "Kontynuuj mimo to",
 		"tooltip": "Kontynuuj podczas wykonywania polecenia"
@@ -221,6 +229,7 @@
 		"abort": "Przerwij",
 		"pid": "PID: {{pid}}",
 		"exitStatus": "Zakończono ze statusem {{exitCode}}",
+		"malformedCommand": "Nieprawidlowe polecenie: blad skladni shell",
 		"manageCommands": "Polecenia zatwierdzone automatycznie",
 		"addToAllowed": "Dodaj do listy dozwolonych",
 		"removeFromAllowed": "Usuń z listy dozwolonych",
@@ -330,16 +339,11 @@
 	"announcement": {
 		"title": "Zoo Code {{version}} wydany",
 		"support": "Wesprzyj Zoo Code, dając nam gwiazdkę na <githubLink>GitHub</githubLink>.",
-		"handoff": {
-			"heading": "Roo Code wraca! Teraz jako wtyczka utrzymywana przez społeczność pod nazwą Zoo Code!!",
-			"description": "Jeśli nie jesteś na bieżąco, zespół Roo Code niedawno ogłosił, że wygasza rozwój Roo Code i archiwizuje dotychczasową pracę. Ale bez obaw — społeczność ruszyła do działania, aby kontynuować dziedzictwo Roo Code pod nową nazwą i w nowym domu! Nie jesteśmy już tylko jednym „Roo” — jesteśmy społecznością, czyli „Zoo”, jeśli wolisz. Zoo Code to wtyczka utrzymywana przez społeczność, która przejmuje pałeczkę tam, gdzie Roo Code skończył, i zobowiązujemy się zachować ducha Roo, jednocześnie wprowadzając nowe funkcje i ulepszenia. Chcemy też ogromnie podziękować całemu zespołowi Roo Code za ich niesamowitą pracę i stworzenie tak świetnego narzędzia dla deweloperów. Cieszymy się, że możemy rozwijać ich dorobek i zobaczyć, dokąd społeczność zaprowadzi Zoo Code w przyszłości!",
-			"readMore": "Zobacz nową stronę główną Zoo Code i przeczytaj pełne ogłoszenie"
-		},
 		"release": {
 			"heading": "Co nowego:",
-			"highlight1": "Claude Opus 4.8 i Opencode Go: Claude Opus 4.8 dodano dla Anthropic, Bedrock i Vertex, a Opencode Go dołączono jako nowego dostawcę pierwszej klasy.",
-			"highlight2": "Niezawodne anulowanie zadań: Anulowanie zadania teraz poprawnie kończy działający proces, z automatycznym ponowieniem Ctrl+C dla opornych procesów.",
-			"highlight3": "Poprawki dostawców i edytora: Naprawiono niestandardowe ID modeli Gemini, obcinanie diffów Grok, wykrywanie PowerShell w Windows i nazwy akcji kodu VS Code."
+			"highlight1": "Rodzina OpenAI GPT-5.6 (Sol, Terra, Luna) — dostępna zarówno w OpenAI Codex, jak i OpenAI Native.",
+			"highlight2": "Obsługa Grok 4.5 — nowy flagowy model xAI, a także poprawka reasoning effort, z której korzysta również Grok 4 Mini.",
+			"highlight3": "Provider Kenari — wysokiej klasy gateway AI kompatybilny z OpenAI, rozliczany w rupii, obsługujący Claude, GPT, DeepSeek, GLM, Kimi i więcej."
 		},
 		"cloudAgents": {
 			"heading": "Nowości w chmurze:",

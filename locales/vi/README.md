@@ -16,13 +16,18 @@
 
         ## Chúng tôi là Zoo Code
 
-> Có thể bạn đã thấy [thông báo gần đây](https://x.com/mattrubens/status/2046636598859559114) từ đội ngũ Roo 🦘🦘🦘. Tóm lại, đội ngũ đang dần giảm việc phát triển Roo Code một cách tích cực để tập trung vào [Roomote](https://roomote.dev/). Tin này thật khó chấp nhận với nhiều người dùng Roo; plugin này có ý nghĩa rất lớn với cộng đồng này.
+> Zoo Code tiếp tục phát triển dự án này sau khi đội ngũ Roo dừng việc phát
+> triển tích cực Roo Code để tập trung vào [Roomote](https://roomote.dev/).
+> Cảm ơn đội ngũ Roo vì tất cả những gì họ đã xây dựng.
 >
-> Chúng tôi muốn cảm ơn toàn bộ đội ngũ Roo vì công sức họ đã dành cho plugin này. Chúng tôi sẽ không nêu tên từng người ở đây, nhưng tất cả chúng ta đều có thể đồng ý rằng họ là những nhà phát triển xuất sắc và, quan trọng không kém, là những con người tuyệt vời. Cảm ơn đội ngũ Roo.
->
-> Người dùng Roo đến từ đủ mọi kiểu khác nhau. Có người dùng nó chuyên nghiệp trong công việc hằng ngày, có người dùng nó để nghĩ ra những workflow phức tạp đến khó tin. Có người dùng nó để cải thiện chính Roo, trong khi người khác dùng nó để cải thiện những model mà Roo đang sử dụng (siêu meta). Điều chúng tôi muốn nói là cộng đồng rất đa dạng, và dù một chú kangaroo 🦘🦘🦘 là một loài vật cao quý và nổi bật, chúng tôi cảm thấy một "Zoo" 🐘🦡🦒🦓🦛🦧🦭🦦 với nhiều loài khác nhau phản ánh sự đa dạng đó tốt hơn.
->
-> Vì vậy, chúng tôi muốn thông báo rằng **Zoo Code** sẽ tiếp tục phát triển dự án quan trọng này. Đội ngũ nòng cốt gồm những nhà phát triển từng đóng góp cho Roo trước đây và thực sự quan tâm đến plugin này. Chúng tôi sẽ tiếp tục cập nhật model, sửa lỗi và phát hành tính năng. Nhưng trên hết, chúng tôi muốn lắng nghe bạn, cộng đồng đã làm cho plugin này trở nên đặc biệt. Vì vậy, hãy tham gia [Discord](https://discord.gg/VxfP4Vx3gX), [Reddit](https://www.reddit.com/r/ZooCode) của chúng tôi, hoặc [tạo PR hay issue](https://github.com/Zoo-Code-Org/Zoo-Code); nhưng hơn hết, chúng tôi mong bạn tiếp tục gắn bó, kết nối và năng động cùng cộng đồng.
+> Đội ngũ nòng cốt gồm những nhà phát triển từng đóng góp cho Roo trước đây
+> và thực sự quan tâm đến plugin này. Chúng tôi sẽ tiếp tục cập nhật model,
+> sửa lỗi và phát hành tính năng, và chúng tôi dự định lắng nghe sát sao
+> cộng đồng đã làm cho plugin này trở nên đặc biệt. Hãy tham gia cùng chúng
+> tôi trên
+> [Discord](https://discord.gg/VxfP4Vx3gX),
+> [Reddit](https://www.reddit.com/r/ZooCode), hoặc
+> [mở PR hay issue](https://github.com/Zoo-Code-Org/Zoo-Code).
 >
 > _-Zoo Code Team_
 
@@ -30,19 +35,15 @@
 
 Bạn có thể xem hướng dẫn nhanh để chuyển từ Roo Code sang Zoo Code trong [hướng dẫn chuyển đổi Roo→Zoo](https://docs.zoocode.dev/roo-to-zoo-migration). Chúng tôi muốn hỗ trợ người dùng nhiều nhất có thể trong quá trình chuyển đổi, và đó chính là lý do chúng tôi có [Reddit](https://www.reddit.com/r/ZooCode) và [Discord](https://discord.gg/VxfP4Vx3gX). Nếu bạn gặp vấn đề hoặc có câu hỏi, cứ vào hỏi nhé.
 
-## Điểm mới trong v3.56.0
+## Điểm mới trong v3.70.0
 
-- Hỗ trợ **Claude Opus 4.8** trên các provider Anthropic, Bedrock và Vertex
-- **Opencode Go** được thêm làm provider API hạng nhất mới
-- **Hủy tác vụ đáng tin cậy** — hủy tác vụ giờ sẽ kết thúc đúng tiến trình đang chạy, với tính năng tự động thử lại Ctrl+C cho các tiến trình khó dừng
-- Sửa lỗi ID model tùy chỉnh của Gemini bị bỏ qua và rơi về mặc định
-- Sửa lỗi diff Grok bị cắt ngắn do thiếu marker
-- Sửa lỗi phát hiện PowerShell trên Windows khi không có shell profile
-- Sửa lỗi code action của VS Code vẫn hiển thị thương hiệu Roo Code; đã bản địa hóa sang tất cả ngôn ngữ được hỗ trợ
-- Sửa cảnh báo Vertex AI khi trường Google Cloud Credentials nhận đường dẫn file
-- Sáu bản cập nhật bảo mật phụ thuộc (diff, i18next-http-backend, fast-xml-parser, simple-git, uuid, turbo)
-
----
+- **Dòng OpenAI GPT-5.6** — `Sol`, `Terra`, và `Luna` hiện đã có sẵn trên cả hai đường nhà cung cấp OpenAI Codex và OpenAI Native.
+- **Hỗ trợ Grok 4.5** — model chủ lực mới của xAI, cùng với bản sửa lỗi định dạng reasoning-effort cũng mang lại lợi ích cho Grok 4 Mini.
+- **Hỗ trợ nhà cung cấp Kenari** — một cổng AI hạng nhất, tương thích OpenAI, tính phí bằng Rupiah, bao phủ Claude, GPT, DeepSeek, GLM, Kimi và nhiều hơn nữa.
+- Hiển thị nút cô đọng ngữ cảnh và thanh tiến trình cửa sổ ngữ cảnh trong tiêu đề tác vụ đã thu gọn.
+- Sửa lỗi: mất đầu ra terminal và hoàn thành tác vụ quá sớm trên các terminal nguội.
+- Sửa lỗi: đính kèm hình ảnh cho các model Zoo Gateway và Vercel AI Gateway giờ đây tuân theo các thẻ khả năng vision trực tiếp thay vì danh sách cho phép tĩnh.
+- Cập nhật phụ thuộc và công cụ.
 
 ## Zoo Code có thể làm gì cho BẠN?
 

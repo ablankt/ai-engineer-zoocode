@@ -21,7 +21,7 @@ import { ApiStream, ApiStreamUsageChunk } from "../transform/stream"
 import { getModelParams } from "../transform/model-params"
 
 import { BaseProvider } from "./base-provider"
-import type { SingleCompletionHandler, ApiHandlerCreateMessageMetadata } from "../index"
+import type { SingleCompletionHandler, ApiHandlerCreateMessageMetadata, CompletePromptOptions } from "../index"
 import { isMcpTool } from "../../utils/mcp-name"
 import { sanitizeOpenAiCallId } from "../../utils/tool-id"
 import { openAiCodexOAuthManager } from "../../integrations/openai-codex/oauth"
@@ -371,6 +371,7 @@ export class OpenAiCodexHandler extends BaseProvider implements SingleCompletion
 						apiKey: accessToken,
 						baseURL: CODEX_API_BASE_URL,
 						defaultHeaders: codexHeaders,
+						timeout: this.timeoutMs,
 					})
 
 				const stream = (await (client as any).responses.create(requestBody, {
@@ -428,8 +429,10 @@ export class OpenAiCodexHandler extends BaseProvider implements SingleCompletion
 							content.push({ type: "input_text", text: block.text })
 						} else if (block.type === "image") {
 							const image = block as Anthropic.Messages.ImageBlockParam
-							const imageUrl = `data:${image.source.media_type};base64,${image.source.data}`
-							content.push({ type: "input_image", image_url: imageUrl })
+							if (image.source.type === "base64") {
+								const imageUrl = `data:${image.source.media_type};base64,${image.source.data}`
+								content.push({ type: "input_image", image_url: imageUrl })
+							}
 						} else if (block.type === "tool_result") {
 							const result =
 								typeof block.content === "string"
@@ -1117,7 +1120,7 @@ export class OpenAiCodexHandler extends BaseProvider implements SingleCompletion
 	override getModel() {
 		const modelId = this.options.apiModelId
 
-		let id = modelId && modelId in openAiCodexModels ? (modelId as OpenAiCodexModelId) : openAiCodexDefaultModelId
+		const id = modelId && modelId in openAiCodexModels ? (modelId as OpenAiCodexModelId) : openAiCodexDefaultModelId
 
 		const info: ModelInfo = openAiCodexModels[id]
 
@@ -1151,7 +1154,7 @@ export class OpenAiCodexHandler extends BaseProvider implements SingleCompletion
 		return this.lastResponseId
 	}
 
-	async completePrompt(prompt: string): Promise<string> {
+	async completePrompt(prompt: string, options?: CompletePromptOptions): Promise<string> {
 		this.abortController = new AbortController()
 
 		try {

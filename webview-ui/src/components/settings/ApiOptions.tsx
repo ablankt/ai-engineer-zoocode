@@ -25,6 +25,7 @@ import { vscode } from "@src/utils/vscode"
 import { validateApiConfigurationExcludingModelErrors, getModelValidationError } from "@src/utils/validate"
 import { useAppTranslation } from "@src/i18n/TranslationContext"
 import { useRouterModels } from "@src/components/ui/hooks/useRouterModels"
+import { useZooGatewayRouterModelsSync } from "@src/components/ui/hooks/useZooGatewayRouterModelsSync"
 import { useSelectedModel } from "@src/components/ui/hooks/useSelectedModel"
 import { requestLmStudioModels } from "@src/components/ui/hooks/useLmStudioModels"
 import { useExtensionState } from "@src/context/ExtensionStateContext"
@@ -70,8 +71,10 @@ import {
 	XAI,
 	ZAi,
 	Fireworks,
+	Friendli,
 	VercelAiGateway,
 	OpenCodeGo,
+	Kenari,
 	ZooGateway,
 	MiniMax,
 	Mimo,
@@ -171,6 +174,7 @@ const ApiOptions = ({
 		typeof apiConfiguration.apiProvider === "string" && isRetiredProvider(apiConfiguration.apiProvider)
 
 	const { data: routerModels, refetch: refetchRouterModels } = useRouterModels()
+	useZooGatewayRouterModelsSync()
 
 	const { data: openRouterModelProviders } = useOpenRouterModelProviders(
 		apiConfiguration?.openRouterModelId,
@@ -220,7 +224,15 @@ const ApiOptions = ({
 				requestLmStudioModels(apiConfiguration?.lmStudioBaseUrl)
 			} else if (selectedProvider === "vscode-lm") {
 				vscode.postMessage({ type: "requestVsCodeLmModels" })
-			} else if (selectedProvider === "litellm" || selectedProvider === "poe") {
+			} else if (selectedProvider === "litellm") {
+				vscode.postMessage({
+					type: "requestRouterModels",
+					values: {
+						litellmApiKey: apiConfiguration?.litellmApiKey,
+						litellmBaseUrl: apiConfiguration?.litellmBaseUrl,
+					},
+				})
+			} else if (selectedProvider === "poe") {
 				vscode.postMessage({ type: "requestRouterModels" })
 			}
 		},
@@ -635,6 +647,17 @@ const ApiOptions = ({
 						/>
 					)}
 
+					{selectedProvider === "kenari" && (
+						<Kenari
+							apiConfiguration={apiConfiguration}
+							setApiConfigurationField={setApiConfigurationField}
+							routerModels={routerModels}
+							organizationAllowList={organizationAllowList}
+							modelValidationError={modelValidationError}
+							simplifySettings={fromWelcomeView}
+						/>
+					)}
+
 					{selectedProvider === "zoo-gateway" && (
 						<ZooGateway
 							apiConfiguration={apiConfiguration}
@@ -648,6 +671,13 @@ const ApiOptions = ({
 
 					{selectedProvider === "fireworks" && (
 						<Fireworks
+							apiConfiguration={apiConfiguration}
+							setApiConfigurationField={setApiConfigurationField}
+						/>
+					)}
+
+					{selectedProvider === "friendli" && (
+						<Friendli
 							apiConfiguration={apiConfiguration}
 							setApiConfigurationField={setApiConfigurationField}
 						/>

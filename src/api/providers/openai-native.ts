@@ -26,7 +26,7 @@ import { ApiStream, ApiStreamUsageChunk } from "../transform/stream"
 import { getModelParams } from "../transform/model-params"
 
 import { BaseProvider } from "./base-provider"
-import type { SingleCompletionHandler, ApiHandlerCreateMessageMetadata } from "../index"
+import type { SingleCompletionHandler, ApiHandlerCreateMessageMetadata, CompletePromptOptions } from "../index"
 import { isMcpTool } from "../../utils/mcp-name"
 import { sanitizeOpenAiCallId } from "../../utils/tool-id"
 
@@ -104,6 +104,7 @@ export class OpenAiNativeHandler extends BaseProvider implements SingleCompletio
 				session_id: this.sessionId,
 				"User-Agent": userAgent,
 			},
+			timeout: this.timeoutMs,
 		})
 	}
 
@@ -482,8 +483,10 @@ export class OpenAiNativeHandler extends BaseProvider implements SingleCompletio
 							content.push({ type: "input_text", text: block.text })
 						} else if (block.type === "image") {
 							const image = block as Anthropic.Messages.ImageBlockParam
-							const imageUrl = `data:${image.source.media_type};base64,${image.source.data}`
-							content.push({ type: "input_image", image_url: imageUrl })
+							if (image.source.type === "base64") {
+								const imageUrl = `data:${image.source.media_type};base64,${image.source.data}`
+								content.push({ type: "input_image", image_url: imageUrl })
+							}
 						} else if (block.type === "tool_result") {
 							// Map Anthropic tool_result to Responses API function_call_output item
 							const result =
@@ -674,8 +677,8 @@ export class OpenAiNativeHandler extends BaseProvider implements SingleCompletio
 		const decoder = new TextDecoder()
 		let buffer = ""
 		let hasContent = false
-		let totalInputTokens = 0
-		let totalOutputTokens = 0
+		const totalInputTokens = 0
+		const totalOutputTokens = 0
 
 		try {
 			while (true) {
@@ -1435,7 +1438,7 @@ export class OpenAiNativeHandler extends BaseProvider implements SingleCompletio
 	override getModel() {
 		const modelId = this.options.apiModelId
 
-		let id =
+		const id =
 			modelId && modelId in openAiNativeModels ? (modelId as OpenAiNativeModelId) : openAiNativeDefaultModelId
 
 		const info: ModelInfo = openAiNativeModels[id]
@@ -1481,14 +1484,12 @@ export class OpenAiNativeHandler extends BaseProvider implements SingleCompletio
 	getResponseId(): string | undefined {
 		return this.lastResponseId
 	}
-
-	async completePrompt(prompt: string): Promise<string> {
-		// Create AbortController for cancellation
-		this.abortController = new AbortController()
-
+	async completePrompt(prompt: string, options?: CompletePromptOptions): Promise<string> {
 		try {
+			this.abortController = new AbortController()
+
 			const model = this.getModel()
-			const { verbosity, reasoning } = model
+			const { verbosity } = model
 
 			// Resolve reasoning effort for models that support it
 			const reasoningEffort = this.getReasoningEffort(model)

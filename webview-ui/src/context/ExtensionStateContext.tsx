@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from "react"
+import React, { createContext, useCallback, useEffect, useState } from "react"
 
 import {
 	type ProviderSettings,
@@ -14,11 +14,13 @@ import {
 	type ExtensionState,
 	type MarketplaceInstalledMetadata,
 	type SkillMetadata,
+	type RuleMetadata,
 	type Command,
 	type McpServer,
 	RouterModels,
 	ORGANIZATION_ALLOW_ALL,
 	DEFAULT_CHECKPOINT_TIMEOUT_SECONDS,
+	DEFAULT_DIFF_FUZZY_THRESHOLD,
 } from "@roo-code/types"
 
 import { findLastIndex } from "@roo/array"
@@ -147,6 +149,7 @@ export interface ExtensionStateContextType extends ExtensionState {
 	showWorktreesInHomeScreen: boolean
 	setShowWorktreesInHomeScreen: (value: boolean) => void
 	skills?: SkillMetadata[]
+	rules: RuleMetadata[]
 }
 
 export const ExtensionStateContext = createContext<ExtensionStateContextType | undefined>(undefined)
@@ -209,6 +212,7 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 		checkpointTimeout: DEFAULT_CHECKPOINT_TIMEOUT_SECONDS, // Default to 15 seconds
 		language: "en", // Default language code
 		writeDelayMs: 1000,
+		diffFuzzyThreshold: DEFAULT_DIFF_FUZZY_THRESHOLD,
 		terminalShellIntegrationTimeout: 4000,
 		mcpEnabled: true,
 		taskSyncEnabled: false,
@@ -286,6 +290,7 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 		global: {},
 	})
 	const [skills, setSkills] = useState<SkillMetadata[]>([])
+	const [rules, setRules] = useState<RuleMetadata[]>([])
 	const [includeTaskHistoryInEnhance, setIncludeTaskHistoryInEnhance] = useState(true)
 	const [includeCurrentTime, setIncludeCurrentTime] = useState(true)
 	const [includeCurrentCost, setIncludeCurrentCost] = useState(true)
@@ -312,7 +317,7 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 				case "state": {
 					const newState = message.state ?? {}
 					setState((prevState) => mergeExtensionState(prevState, newState))
-					setShowWelcome(!checkExistKey(newState.apiConfiguration))
+					setShowWelcome(!checkExistKey(newState.apiConfiguration, newState.zooCodeIsAuthenticated))
 					setDidHydrateState(true)
 					// Update alwaysAllowFollowupQuestions if present in state message
 					if ((newState as any).alwaysAllowFollowupQuestions !== undefined) {
@@ -401,6 +406,10 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 					}
 					break
 				}
+				case "rules": {
+					setRules(message.rules ?? [])
+					break
+				}
 				case "mcpServers": {
 					setMcpServers(message.mcpServers ?? [])
 					break
@@ -414,7 +423,13 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 					break
 				}
 				case "routerModels": {
-					setExtensionRouterModels(message.routerModels)
+					const provider = message.values?.provider as string | undefined
+					const incoming = message.routerModels
+					if (provider && incoming) {
+						setExtensionRouterModels((current) => (current ? { ...current, ...incoming } : incoming))
+					} else {
+						setExtensionRouterModels(incoming)
+					}
 					break
 				}
 				case "marketplaceData": {
@@ -613,6 +628,7 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 		includeCurrentCost,
 		setIncludeCurrentCost,
 		skills,
+		rules,
 		showWorktreesInHomeScreen: state.showWorktreesInHomeScreen ?? true,
 		setShowWorktreesInHomeScreen: (value) =>
 			setState((prevState) => ({ ...prevState, showWorktreesInHomeScreen: value })),
@@ -622,7 +638,7 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 }
 
 export const useExtensionState = () => {
-	const context = useContext(ExtensionStateContext)
+	const context = React.useContext(ExtensionStateContext)
 
 	if (context === undefined) {
 		throw new Error("useExtensionState must be used within an ExtensionStateContextProvider")

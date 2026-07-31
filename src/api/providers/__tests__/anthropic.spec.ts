@@ -15,54 +15,56 @@ vitest.mock("@roo-code/telemetry", () => ({
 const mockCreate = vitest.fn()
 
 vitest.mock("@anthropic-ai/sdk", () => {
-	const mockAnthropicConstructor = vitest.fn().mockImplementation(() => ({
-		messages: {
-			create: mockCreate.mockImplementation(async (options) => {
-				if (!options.stream) {
+	const mockAnthropicConstructor = vitest.fn().mockImplementation(function () {
+		return {
+			messages: {
+				create: mockCreate.mockImplementation(async (options) => {
+					if (!options.stream) {
+						return {
+							id: "test-completion",
+							content: [{ type: "text", text: "Test response" }],
+							role: "assistant",
+							model: options.model,
+							usage: {
+								input_tokens: 10,
+								output_tokens: 5,
+							},
+						}
+					}
 					return {
-						id: "test-completion",
-						content: [{ type: "text", text: "Test response" }],
-						role: "assistant",
-						model: options.model,
-						usage: {
-							input_tokens: 10,
-							output_tokens: 5,
+						async *[Symbol.asyncIterator]() {
+							yield {
+								type: "message_start",
+								message: {
+									usage: {
+										input_tokens: 100,
+										output_tokens: 50,
+										cache_creation_input_tokens: 20,
+										cache_read_input_tokens: 10,
+									},
+								},
+							}
+							yield {
+								type: "content_block_start",
+								index: 0,
+								content_block: {
+									type: "text",
+									text: "Hello",
+								},
+							}
+							yield {
+								type: "content_block_delta",
+								delta: {
+									type: "text_delta",
+									text: " world",
+								},
+							}
 						},
 					}
-				}
-				return {
-					async *[Symbol.asyncIterator]() {
-						yield {
-							type: "message_start",
-							message: {
-								usage: {
-									input_tokens: 100,
-									output_tokens: 50,
-									cache_creation_input_tokens: 20,
-									cache_read_input_tokens: 10,
-								},
-							},
-						}
-						yield {
-							type: "content_block_start",
-							index: 0,
-							content_block: {
-								type: "text",
-								text: "Hello",
-							},
-						}
-						yield {
-							type: "content_block_delta",
-							delta: {
-								type: "text_delta",
-								text: " world",
-							},
-						}
-					},
-				}
-			}),
-		},
-	}))
+				}),
+			},
+		}
+	})
 
 	return {
 		Anthropic: mockAnthropicConstructor,
@@ -399,6 +401,83 @@ describe("AnthropicHandler", () => {
 			expect(requestBody?.thinking).toEqual({ type: "adaptive" })
 			expect(requestBody?.max_tokens).toBe(32768)
 		})
+
+		it("should use adaptive thinking for Claude Fable 5 when reasoning is enabled", async () => {
+			const fableHandler = new AnthropicHandler({
+				apiKey: "test-api-key",
+				apiModelId: "claude-fable-5",
+				enableReasoningEffort: true,
+				modelMaxTokens: 32768,
+			})
+
+			const stream = fableHandler.createMessage(systemPrompt, [
+				{
+					role: "user",
+					content: [{ type: "text" as const, text: "Hello" }],
+				},
+			])
+
+			for await (const _chunk of stream) {
+				// Consume stream
+			}
+
+			const requestBody = mockCreate.mock.calls[mockCreate.mock.calls.length - 1]?.[0]
+			const requestOptions = mockCreate.mock.calls[mockCreate.mock.calls.length - 1]?.[1]
+			expect(requestBody?.thinking).toEqual({ type: "adaptive" })
+			expect(requestBody?.temperature).toBeUndefined()
+			expect(requestBody?.max_tokens).toBe(32768)
+			expect(requestOptions?.headers?.["anthropic-beta"]).toContain("prompt-caching-2024-07-31")
+		})
+
+		it("should use adaptive thinking for Claude Sonnet 5 when reasoning is enabled", async () => {
+			const sonnetHandler = new AnthropicHandler({
+				apiKey: "test-api-key",
+				apiModelId: "claude-sonnet-5",
+				enableReasoningEffort: true,
+				modelMaxTokens: 32768,
+			})
+
+			const stream = sonnetHandler.createMessage(systemPrompt, [
+				{
+					role: "user",
+					content: [{ type: "text" as const, text: "Hello" }],
+				},
+			])
+
+			for await (const _chunk of stream) {
+				// Consume stream
+			}
+
+			const requestBody = mockCreate.mock.calls[mockCreate.mock.calls.length - 1]?.[0]
+			const requestOptions = mockCreate.mock.calls[mockCreate.mock.calls.length - 1]?.[1]
+			expect(requestBody?.thinking).toEqual({ type: "adaptive" })
+			expect(requestBody?.temperature).toBeUndefined()
+			expect(requestBody?.max_tokens).toBe(32768)
+			expect(requestOptions?.headers?.["anthropic-beta"]).toContain("prompt-caching-2024-07-31")
+		})
+
+		it("should send the custom model ID as-is and use adaptive thinking for a custom Sonnet-5-family model", async () => {
+			const customHandler = new AnthropicHandler({
+				apiKey: "test-api-key",
+				apiModelId: "claude-sonnet-5-bf",
+				enableReasoningEffort: true,
+			})
+
+			const stream = customHandler.createMessage(systemPrompt, [
+				{
+					role: "user",
+					content: [{ type: "text" as const, text: "Hello" }],
+				},
+			])
+
+			for await (const _chunk of stream) {
+				// Consume stream
+			}
+
+			const requestBody = mockCreate.mock.calls[mockCreate.mock.calls.length - 1]?.[0]
+			expect(requestBody?.model).toBe("claude-sonnet-5-bf")
+			expect(requestBody?.thinking).toEqual({ type: "adaptive" })
+		})
 	})
 
 	describe("completePrompt", () => {
@@ -543,6 +622,40 @@ describe("AnthropicHandler", () => {
 			expect(model.reasoningBudget).toBeUndefined()
 		})
 
+		it("should handle Claude Fable 5 model correctly", () => {
+			const handler = new AnthropicHandler({
+				apiKey: "test-api-key",
+				apiModelId: "claude-fable-5",
+			})
+			const model = handler.getModel()
+			expect(model.id).toBe("claude-fable-5")
+			expect(model.info.maxTokens).toBe(128000)
+			expect(model.info.contextWindow).toBe(1000000)
+			expect(model.maxTokens).toBe(8192)
+			expect(model.info.supportsReasoningBinary).toBe(true)
+			expect(model.info.supportsReasoningBudget).toBe(true)
+			expect(model.info.supportsPromptCache).toBe(true)
+			expect(model.info.supportsTemperature).toBe(false)
+			expect(model.reasoningBudget).toBeUndefined()
+		})
+
+		it("should handle Claude Sonnet 5 model correctly", () => {
+			const handler = new AnthropicHandler({
+				apiKey: "test-api-key",
+				apiModelId: "claude-sonnet-5",
+			})
+			const model = handler.getModel()
+			expect(model.id).toBe("claude-sonnet-5")
+			expect(model.info.maxTokens).toBe(128000)
+			expect(model.info.contextWindow).toBe(1000000)
+			expect(model.maxTokens).toBe(8192)
+			expect(model.info.supportsReasoningBinary).toBe(true)
+			expect(model.info.supportsReasoningBudget).toBe(true)
+			expect(model.info.supportsPromptCache).toBe(true)
+			expect(model.info.supportsTemperature).toBe(false)
+			expect(model.reasoningBudget).toBeUndefined()
+		})
+
 		it("should enable 1M context for Claude 4.5 Sonnet when beta flag is set", () => {
 			const handler = new AnthropicHandler({
 				apiKey: "test-api-key",
@@ -565,6 +678,38 @@ describe("AnthropicHandler", () => {
 			expect(model.info.contextWindow).toBe(1000000)
 			expect(model.info.inputPrice).toBe(6.0)
 			expect(model.info.outputPrice).toBe(22.5)
+		})
+
+		it("should honor a custom/unrecognized model ID instead of silently falling back to anthropicDefaultModelId", () => {
+			const handler = new AnthropicHandler({
+				apiKey: "test-api-key",
+				apiModelId: "claude-sonnet-5-bf",
+			})
+			const model = handler.getModel()
+			expect(model.id).toBe("claude-sonnet-5-bf")
+		})
+
+		it("should guess capabilities for a custom/unrecognized model ID from known model-family substrings", () => {
+			const handler = new AnthropicHandler({
+				apiKey: "test-api-key",
+				apiModelId: "claude-sonnet-5-bf",
+			})
+			const model = handler.getModel()
+			expect(model.info.supportsReasoningBinary).toBe(true)
+			expect(model.info.maxTokens).toBe(128000)
+			expect(model.info.contextWindow).toBe(1000000)
+		})
+
+		it("should fall back to anthropicDefaultModelId's info when a custom model ID matches no known family", () => {
+			const handler = new AnthropicHandler({
+				apiKey: "test-api-key",
+				apiModelId: "totally-unknown-custom-model",
+			})
+			const model = handler.getModel()
+			expect(model.id).toBe("totally-unknown-custom-model")
+			expect(model.info.maxTokens).toBe(64000)
+			expect(model.info.contextWindow).toBe(200000)
+			expect(model.info.supportsReasoningBinary).toBeUndefined()
 		})
 	})
 

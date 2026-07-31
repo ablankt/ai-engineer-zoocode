@@ -18,7 +18,7 @@ import { ApiStream } from "../transform/stream"
 import { convertToOpenAiMessages } from "../transform/openai-format"
 import { addCacheBreakpoints } from "../transform/caching/vercel-ai-gateway"
 
-import type { SingleCompletionHandler, ApiHandlerCreateMessageMetadata } from "../index"
+import type { SingleCompletionHandler, ApiHandlerCreateMessageMetadata, CompletePromptOptions } from "../index"
 import { RouterProvider } from "./router-provider"
 
 function getApiErrorStatus(error: unknown): number | undefined {
@@ -35,6 +35,20 @@ function getApiErrorCode(error: unknown): string | undefined {
 	if (typeof err.code === "string") return err.code
 	if (typeof err.error?.code === "string") return err.error.code
 	return undefined
+}
+
+// The gateway sends in-band stream errors as `{ message, status?, code? }`. Rebuild
+// them into an Error carrying status/code so the same classify/surface logic that
+// handles thrown HTTP errors applies to mid-stream failures too.
+// Exported for unit tests.
+export function toGatewayStreamError(raw: unknown): Error {
+	const err = raw as { message?: unknown; status?: unknown; code?: unknown } | null
+	const message =
+		typeof err?.message === "string" && err.message.length > 0 ? err.message : "Zoo Gateway stream error"
+	return Object.assign(new Error(message), {
+		status: typeof err?.status === "number" ? err.status : undefined,
+		code: typeof err?.code === "string" ? err.code : undefined,
+	})
 }
 
 function buildZooCodeSignInUrl(): string {
@@ -209,6 +223,13 @@ export class ZooGatewayHandler extends RouterProvider implements SingleCompletio
 			})
 
 			for await (const chunk of completion) {
+				// Once the gateway starts streaming the HTTP status is already 200, so it
+				// reports upstream failures (e.g. provider rate limits) as an in-band error
+				// chunk. Surface it so the user sees the real reason instead of an empty reply.
+				if ("error" in chunk && chunk.error) {
+					throw toGatewayStreamError(chunk.error)
+				}
+
 				const delta = chunk.choices[0]?.delta
 				if (delta?.content) {
 					yield {
@@ -255,7 +276,7 @@ export class ZooGatewayHandler extends RouterProvider implements SingleCompletio
 		}
 	}
 
-	async completePrompt(prompt: string): Promise<string> {
+	async completePrompt(prompt: string, options?: CompletePromptOptions): Promise<string> {
 		this.ensureAuthenticated()
 
 		const { id: modelId, info } = await this.fetchModel()

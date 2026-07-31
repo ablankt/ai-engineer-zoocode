@@ -1,12 +1,19 @@
 import * as path from "path"
 import * as os from "os"
 import * as fs from "fs/promises"
+import { readFileSync } from "fs"
 
 import { runTests } from "@vscode/test-electron"
 import { LLMock } from "@copilotkit/aimock"
 
 import { addApplyDiffResultFixtures } from "./fixtures/apply-diff"
+import { addDeepSeekV4Fixtures } from "./fixtures/deepseek-v4"
 import { addExecuteCommandResultFixtures } from "./fixtures/execute-command"
+import { addFastExitShellRaceResultFixtures } from "./fixtures/fast-exit-shell-race"
+import { addZeroChunkShellRaceResultFixtures } from "./fixtures/zero-chunk-shell-race"
+import { addTerminalReuseShellRaceFixtures } from "./fixtures/terminal-reuse-shell-race"
+import { addLongRuningSilentCommandFixtures } from "./fixtures/long-running-silent-command"
+import { addColdShellInitFixtures } from "./fixtures/cold-shell-init"
 import { addTerminalProfileResultFixtures } from "./fixtures/terminal-profile"
 import { addListFilesResultFixtures } from "./fixtures/list-files"
 import { addReadFileResultFixtures } from "./fixtures/read-file"
@@ -109,6 +116,11 @@ async function main() {
 			if (!isRecord) {
 				addApplyDiffResultFixtures(mock)
 				addExecuteCommandResultFixtures(mock)
+				addFastExitShellRaceResultFixtures(mock)
+				addZeroChunkShellRaceResultFixtures(mock)
+				addTerminalReuseShellRaceFixtures(mock)
+				addLongRuningSilentCommandFixtures(mock)
+				addColdShellInitFixtures(mock)
 				addTerminalProfileResultFixtures(mock)
 				addListFilesResultFixtures(mock)
 				addReadFileResultFixtures(mock)
@@ -116,6 +128,7 @@ async function main() {
 				addSubtaskFixtures(mock)
 				addUseMcpToolResultFixtures(mock)
 				addWriteToFileResultFixtures(mock)
+				addDeepSeekV4Fixtures(mock)
 
 				// The modes test (switch_mode → ask) triggers a second API call whose last
 				// user message starts with <environment_details> directly — no <user_message>
@@ -156,12 +169,16 @@ async function main() {
 		}
 
 		// Download VS Code, unzip it and run the integration test
+		// Read VS Code version from package.json to keep in sync with @types/vscode
+		const pkg = JSON.parse(readFileSync(path.resolve(__dirname, "../package.json"), "utf-8"))
+		const vscodeVersion = process.env.VSCODE_VERSION || pkg.devDependencies["@types/vscode"]
+
 		await runTests({
 			extensionDevelopmentPath,
 			extensionTestsPath,
 			launchArgs: [testWorkspace],
 			extensionTestsEnv,
-			version: process.env.VSCODE_VERSION || "1.101.2",
+			version: vscodeVersion,
 		})
 	} catch (error) {
 		console.error("Failed to run tests", error)

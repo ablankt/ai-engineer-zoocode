@@ -2,7 +2,13 @@
 
 // Mock vscode first to avoid import errors when the provider stack pulls
 // transitive vscode-dependent modules during construction.
-vitest.mock("vscode", () => ({}))
+vitest.mock("vscode", () => ({
+	workspace: {
+		getConfiguration: () => ({
+			get: (_key: string, defaultValue?: unknown) => defaultValue,
+		}),
+	},
+}))
 
 vitest.mock("@roo-code/telemetry", () => ({
 	TelemetryService: {
@@ -16,7 +22,7 @@ vitest.mock("@roo-code/telemetry", () => ({
 // credentials handed to GoogleAuth via googleAuthOptions.
 const googleGenAICtor = vitest.fn()
 vitest.mock("@google/genai", () => ({
-	GoogleGenAI: vitest.fn().mockImplementation((args: unknown) => {
+	GoogleGenAI: vitest.fn().mockImplementation(function (args: unknown) {
 		googleGenAICtor(args)
 		return {
 			models: {
@@ -31,7 +37,7 @@ vitest.mock("@google/genai", () => ({
 // Capture the constructor args passed to GoogleAuth (Anthropic-on-Vertex path).
 const googleAuthCtor = vitest.fn()
 vitest.mock("google-auth-library", () => ({
-	GoogleAuth: vitest.fn().mockImplementation((args: unknown) => {
+	GoogleAuth: vitest.fn().mockImplementation(function (args: unknown) {
 		googleAuthCtor(args)
 		return {
 			/* GoogleAuth instance shape is opaque to these tests */
@@ -40,9 +46,11 @@ vitest.mock("google-auth-library", () => ({
 }))
 
 vitest.mock("@anthropic-ai/vertex-sdk", () => ({
-	AnthropicVertex: vitest.fn().mockImplementation(() => ({
-		messages: { create: vitest.fn() },
-	})),
+	AnthropicVertex: vitest.fn().mockImplementation(function () {
+		return {
+			messages: { create: vitest.fn() },
+		}
+	}),
 }))
 
 import { GeminiHandler } from "../gemini"
@@ -61,8 +69,8 @@ describe("parseVertexJsonCredentials", () => {
 	let errorSpy: ReturnType<typeof vi.spyOn>
 
 	beforeEach(() => {
-		warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
-		errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+		warnSpy = vi.spyOn(console, "warn").mockImplementation(function () {})
+		errorSpy = vi.spyOn(console, "error").mockImplementation(function () {})
 	})
 
 	afterEach(() => {
@@ -138,8 +146,8 @@ describe("GeminiHandler vertex credentials wiring", () => {
 	let errorSpy: ReturnType<typeof vi.spyOn>
 
 	beforeEach(() => {
-		warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
-		errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+		warnSpy = vi.spyOn(console, "warn").mockImplementation(function () {})
+		errorSpy = vi.spyOn(console, "error").mockImplementation(function () {})
 		googleGenAICtor.mockClear()
 	})
 
@@ -227,7 +235,7 @@ describe("VertexHandler inherits the path-shape guard from GeminiHandler", () =>
 	let warnSpy: ReturnType<typeof vi.spyOn>
 
 	beforeEach(() => {
-		warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+		warnSpy = vi.spyOn(console, "warn").mockImplementation(function () {})
 		googleGenAICtor.mockClear()
 	})
 
@@ -258,8 +266,8 @@ describe("AnthropicVertexHandler vertex credentials wiring", () => {
 	let errorSpy: ReturnType<typeof vi.spyOn>
 
 	beforeEach(() => {
-		warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
-		errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+		warnSpy = vi.spyOn(console, "warn").mockImplementation(function () {})
+		errorSpy = vi.spyOn(console, "error").mockImplementation(function () {})
 		googleAuthCtor.mockClear()
 	})
 
