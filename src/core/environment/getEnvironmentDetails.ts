@@ -126,7 +126,7 @@ export async function getEnvironmentDetails(cline: Task, includeFileDetails: boo
 
 		// Process each terminal with output.
 		for (const inactiveTerminal of terminalsWithOutput) {
-			let terminalOutputs: string[] = []
+			const terminalOutputs: string[] = []
 
 			// Get output from completed processes queue.
 			const completedProcesses = inactiveTerminal.getProcessesWithOutput()
@@ -241,18 +241,22 @@ export async function getEnvironmentDetails(cline: Task, includeFileDetails: boo
 			if (maxFiles === 0) {
 				details += "(Workspace files context disabled. Use list_files to explore if needed.)"
 			} else {
-				const [files, didHitLimit] = await listFiles(cline.cwd, true, maxFiles)
-				const { showRooIgnoredFiles = false } = state ?? {}
+				try {
+					const [files, didHitLimit] = await listFiles(cline.cwd, true, maxFiles)
+					const { showRooIgnoredFiles = false } = state ?? {}
 
-				const result = formatResponse.formatFilesList(
-					cline.cwd,
-					files,
-					didHitLimit,
-					cline.rooIgnoreController,
-					showRooIgnoredFiles,
-				)
+					const result = formatResponse.formatFilesList(
+						cline.cwd,
+						files,
+						didHitLimit,
+						cline.rooIgnoreController,
+						showRooIgnoredFiles,
+					)
 
-				details += result
+					details += result
+				} catch (error) {
+					details += `(File listing unavailable: ${error instanceof Error ? error.message : String(error)})`
+				}
 			}
 		}
 	}

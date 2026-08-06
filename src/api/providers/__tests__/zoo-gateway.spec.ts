@@ -1,5 +1,11 @@
 // npx vitest run src/api/providers/__tests__/zoo-gateway.spec.ts
 
+vitest.mock("../utils/timeout-config", () => ({
+	getApiRequestTimeout: vitest.fn().mockReturnValue(300_000),
+}))
+
+const MOCK_TIMEOUT_MS = 300_000
+
 const { showErrorMessage, openExternal } = vitest.hoisted(() => ({
 	showErrorMessage: vitest.fn(async () => undefined as string | undefined),
 	openExternal: vitest.fn(async () => true),
@@ -9,6 +15,11 @@ vitest.mock("vscode", () => ({
 	window: { showErrorMessage },
 	env: { openExternal, uriScheme: "vscode", appName: "VS Code" },
 	Uri: { parse: (value: string) => ({ toString: () => value }) },
+	workspace: {
+		getConfiguration: () => ({
+			get: (_key: string, defaultValue?: unknown) => defaultValue,
+		}),
+	},
 }))
 
 vitest.mock("../../../i18n", () => ({
@@ -19,15 +30,19 @@ import OpenAI from "openai"
 
 import { zooGatewayDefaultModelId, ZOO_GATEWAY_DEFAULT_TEMPERATURE } from "@roo-code/types"
 
-import { ZooGatewayHandler, classifyGatewayApiError } from "../zoo-gateway"
+import { ZooGatewayHandler, classifyGatewayApiError, toGatewayStreamError } from "../zoo-gateway"
 import { ApiHandlerOptions } from "../../../shared/api"
 import { Package } from "../../../shared/package"
 import { clearZooCodeToken } from "../../../services/zoo-code-auth"
 
 vitest.mock("openai")
-vitest.mock("delay", () => ({ default: vitest.fn(() => Promise.resolve()) }))
+vitest.mock("delay", () => ({
+	default: vitest.fn(function () {
+		return Promise.resolve()
+	}),
+}))
 vitest.mock("../fetchers/modelCache", () => ({
-	getModels: vitest.fn().mockImplementation(() => {
+	getModels: vitest.fn().mockImplementation(function () {
 		return Promise.resolve({
 			"anthropic/claude-sonnet-4": {
 				maxTokens: 64000,
@@ -60,7 +75,9 @@ const mockGetCachedZooCodeToken = vitest.hoisted(() => vitest.fn<() => string | 
 const mockSessionCleared = vitest.hoisted(() => ({ value: false }))
 
 vitest.mock("../../../services/zoo-code-auth", () => ({
-	getZooCodeBaseUrl: vitest.fn(() => "https://www.zoocode.dev"),
+	getZooCodeBaseUrl: vitest.fn(function () {
+		return "https://www.zoocode.dev"
+	}),
 	getCachedZooCodeToken: () => mockGetCachedZooCodeToken() ?? "",
 	resolveZooGatewaySessionToken: (profileToken?: string) => {
 		const cached = mockGetCachedZooCodeToken()
@@ -81,16 +98,15 @@ vitest.mock("../../transform/caching/vercel-ai-gateway", () => ({
 const mockCreate = vitest.fn()
 
 function mockOpenAIClient() {
-	vitest.mocked(OpenAI).mockImplementation(
-		() =>
-			({
-				chat: {
-					completions: {
-						create: mockCreate,
-					},
+	vitest.mocked(OpenAI).mockImplementation(function () {
+		return {
+			chat: {
+				completions: {
+					create: mockCreate,
 				},
-			}) as unknown as OpenAI,
-	)
+			},
+		} as unknown as OpenAI
+	})
 }
 
 mockOpenAIClient()
@@ -173,6 +189,7 @@ describe("ZooGatewayHandler", () => {
 					"X-Zoo-Editor": "vscode",
 					"X-Zoo-Extension-Version": Package.version,
 				}),
+				timeout: MOCK_TIMEOUT_MS,
 			})
 		})
 
@@ -363,6 +380,48 @@ describe("ZooGatewayHandler", () => {
 				},
 			])
 		})
+
+		it("throws the upstream reason when the gateway sends an in-stream error chunk", async () => {
+			mockCreate.mockImplementation(async () => ({
+				[Symbol.asyncIterator]: async function* () {
+					yield {
+						error: {
+							message: "Too many requests, please wait before trying again",
+							status: 429,
+							code: "rate_limited",
+						},
+					}
+				},
+			}))
+
+			const handler = new ZooGatewayHandler(mockOptions)
+
+			await expect(drainCreateMessage(handler)).rejects.toThrow(
+				"Too many requests, please wait before trying again",
+			)
+		})
+
+		it("surfaces the add-credits prompt when an in-stream error carries a budget code", async () => {
+			mockCreate.mockImplementation(async () => ({
+				[Symbol.asyncIterator]: async function* () {
+					yield {
+						error: {
+							message: "Monthly budget exceeded",
+							status: 429,
+							code: "monthly_budget_exceeded",
+						},
+					}
+				},
+			}))
+
+			const handler = new ZooGatewayHandler(mockOptions)
+
+			await expect(drainCreateMessage(handler)).rejects.toThrow()
+			expect(showErrorMessage).toHaveBeenCalledWith(
+				"common:zooAuth.errors.budget_exceeded",
+				"common:zooAuth.buttons.add_credits",
+			)
+		})
 	})
 
 	describe("completePrompt", () => {
@@ -391,7 +450,7 @@ describe("ZooGatewayHandler", () => {
 
 		it("wraps errors with a Zoo Gateway prefix", async () => {
 			const handler = new ZooGatewayHandler(mockOptions)
-			mockCreate.mockImplementation(() => {
+			mockCreate.mockImplementation(function () {
 				throw new Error("upstream failure")
 			})
 
@@ -443,10 +502,36 @@ describe("ZooGatewayHandler", () => {
 		})
 	})
 
+	describe("toGatewayStreamError", () => {
+		it("preserves the message, status, and code from the chunk", () => {
+			const error = toGatewayStreamError({
+				message: "rate limited",
+				status: 429,
+				code: "rate_limited",
+			}) as Error & {
+				status?: number
+				code?: string
+			}
+
+			expect(error).toBeInstanceOf(Error)
+			expect(error.message).toBe("rate limited")
+			expect(error.status).toBe(429)
+			expect(error.code).toBe("rate_limited")
+		})
+
+		it("falls back to a default message and leaves status/code undefined", () => {
+			const error = toGatewayStreamError({}) as Error & { status?: number; code?: string }
+
+			expect(error.message).toBe("Zoo Gateway stream error")
+			expect(error.status).toBeUndefined()
+			expect(error.code).toBeUndefined()
+		})
+	})
+
 	describe("surfaceGatewayApiError", () => {
 		it("clears the cached token and offers re-sign-in on 401", async () => {
 			const handler = new ZooGatewayHandler(mockOptions)
-			mockCreate.mockImplementation(() => {
+			mockCreate.mockImplementation(function () {
 				throw makeApiError(401)
 			})
 			showErrorMessage.mockResolvedValueOnce("common:zooAuth.buttons.sign_in")
@@ -462,7 +547,7 @@ describe("ZooGatewayHandler", () => {
 
 		it("does not open a URL on 401 when the user dismisses the prompt", async () => {
 			const handler = new ZooGatewayHandler(mockOptions)
-			mockCreate.mockImplementation(() => {
+			mockCreate.mockImplementation(function () {
 				throw makeApiError(401)
 			})
 			showErrorMessage.mockResolvedValueOnce(undefined)
@@ -474,7 +559,7 @@ describe("ZooGatewayHandler", () => {
 
 		it("prompts to add credits on 402", async () => {
 			const handler = new ZooGatewayHandler(mockOptions)
-			mockCreate.mockImplementation(() => {
+			mockCreate.mockImplementation(function () {
 				throw makeApiError(402)
 			})
 			showErrorMessage.mockResolvedValueOnce("common:zooAuth.buttons.add_credits")
@@ -490,7 +575,7 @@ describe("ZooGatewayHandler", () => {
 
 		it("shows the budget message on 429 with a budget code", async () => {
 			const handler = new ZooGatewayHandler(mockOptions)
-			mockCreate.mockImplementation(() => {
+			mockCreate.mockImplementation(function () {
 				throw makeApiError(429, { code: "monthly_budget_exceeded" })
 			})
 
@@ -503,7 +588,7 @@ describe("ZooGatewayHandler", () => {
 
 		it("does not surface a notification on 429 without a budget code", async () => {
 			const handler = new ZooGatewayHandler(mockOptions)
-			mockCreate.mockImplementation(() => {
+			mockCreate.mockImplementation(function () {
 				throw makeApiError(429, { code: "rate_limited" })
 			})
 
@@ -513,7 +598,7 @@ describe("ZooGatewayHandler", () => {
 
 		it("offers contact support on 403", async () => {
 			const handler = new ZooGatewayHandler(mockOptions)
-			mockCreate.mockImplementation(() => {
+			mockCreate.mockImplementation(function () {
 				throw makeApiError(403)
 			})
 			showErrorMessage.mockResolvedValueOnce("common:zooAuth.buttons.contact_support")
@@ -528,7 +613,7 @@ describe("ZooGatewayHandler", () => {
 
 		it("ignores errors without an HTTP status", async () => {
 			const handler = new ZooGatewayHandler(mockOptions)
-			mockCreate.mockImplementation(() => {
+			mockCreate.mockImplementation(function () {
 				throw new Error("network down")
 			})
 
@@ -539,7 +624,7 @@ describe("ZooGatewayHandler", () => {
 
 		it("surfaces the gateway error then wraps the message in completePrompt", async () => {
 			const handler = new ZooGatewayHandler(mockOptions)
-			mockCreate.mockImplementation(() => {
+			mockCreate.mockImplementation(function () {
 				throw makeApiError(402, { message: "out of credits" })
 			})
 

@@ -17,7 +17,9 @@
 		"delete": "Hapus Tugas (Shift + Klik untuk lewati konfirmasi)",
 		"openApiHistory": "Buka Riwayat API",
 		"openUiHistory": "Buka Riwayat UI",
-		"backToParentTask": "Tugas Induk"
+		"backToParentTask": "Tugas Induk",
+		"waitingOnSubtask": "Menunggu subtugas",
+		"goToSubtask": "Pergi ke subtugas"
 	},
 	"history": {
 		"title": "Riwayat"
@@ -34,6 +36,14 @@
 	"startNewTask": {
 		"title": "Mulai Tugas Baru",
 		"tooltip": "Mulai tugas baru"
+	},
+	"seeNewChanges": {
+		"title": "Lihat Perubahan Baru",
+		"tooltip": "Lihat perubahan yang dibuat sejak prompt terakhirmu"
+	},
+	"restoreChanges": {
+		"title": "Pulihkan Perubahan",
+		"tooltip": "Pulihkan file dan status tugas ke prompt terakhirmu"
 	},
 	"reportBug": {
 		"title": "Laporkan Bug"
@@ -221,7 +231,7 @@
 		"didLoad": "Zoo telah memuat keterampilan"
 	},
 	"instructions": {
-		"wantsToFetch": "Roo ingin mengambil instruksi detail untuk membantu tugas saat ini"
+		"wantsToFetch": "Zoo ingin mengambil instruksi detail untuk membantu tugas saat ini"
 	},
 	"fileOperations": {
 		"wantsToRead": "Zoo ingin membaca file ini",
@@ -238,8 +248,8 @@
 		"wantsToGenerateImageProtected": "Zoo ingin menghasilkan gambar di lokasi yang dilindungi",
 		"didGenerateImage": "Zoo telah menghasilkan gambar",
 		"wantsToCreate": "Zoo ingin membuat file baru",
-		"wantsToSearchReplace": "Roo ingin mencari dan mengganti di file ini",
-		"didSearchReplace": "Roo melakukan pencarian dan penggantian pada file ini",
+		"wantsToSearchReplace": "Zoo ingin mencari dan mengganti di file ini",
+		"didSearchReplace": "Zoo melakukan pencarian dan penggantian pada file ini",
 		"wantsToInsert": "Zoo ingin menyisipkan konten ke file ini",
 		"wantsToInsertWithLineNumber": "Zoo ingin menyisipkan konten ke file ini di baris {{lineNumber}}",
 		"wantsToInsertAtEnd": "Zoo ingin menambahkan konten ke akhir file ini"
@@ -272,6 +282,7 @@
 		"running": "Menjalankan",
 		"pid": "PID: {{pid}}",
 		"exitStatus": "Keluar dengan status {{exitCode}}",
+		"malformedCommand": "Perintah tidak valid: kesalahan sintaks shell",
 		"manageCommands": "Perintah yang disetujui secara otomatis",
 		"addToAllowed": "Tambahkan ke daftar yang diizinkan",
 		"removeFromAllowed": "Hapus dari daftar yang diizinkan",
@@ -359,16 +370,11 @@
 	"announcement": {
 		"title": "Zoo Code {{version}} Dirilis",
 		"support": "Dukung Zoo Code dengan memberi kami bintang di <githubLink>GitHub</githubLink>.",
-		"handoff": {
-			"heading": "Roo Code kembali! Sekarang sebagai plugin yang dikelola komunitas bernama Zoo Code!!",
-			"description": "Kalau kamu belum mengikuti kabarnya, tim Roo Code baru-baru ini mengumumkan bahwa mereka menghentikan pengembangan Roo Code dan mengarsipkan pekerjaan yang telah mereka lakukan. Tapi jangan khawatir, komunitas telah melangkah maju untuk melanjutkan warisan Roo Code dengan nama baru dan rumah baru! Kita bukan lagi satu \"Roo\" saja, kita adalah sebuah komunitas, sebuah \"Zoo\" kalau boleh dibilang. Zoo Code adalah plugin yang dikelola komunitas dan melanjutkan dari titik terakhir Roo Code, dan kami berkomitmen menjaga semangat Roo tetap hidup sambil menghadirkan fitur dan peningkatan baru. Kami juga ingin memberi apresiasi besar kepada seluruh tim Roo Code atas kerja luar biasa mereka dan karena telah menciptakan alat yang luar biasa untuk para developer. Kami antusias melanjutkan fondasi mereka dan melihat ke mana komunitas akan membawa Zoo Code ke depannya!",
-			"readMore": "Lihat halaman beranda baru Zoo Code dan baca pengumuman lengkapnya"
-		},
 		"release": {
 			"heading": "Yang Baru:",
-			"highlight1": "Claude Opus 4.8 dan Opencode Go: Claude Opus 4.8 ditambahkan ke Anthropic, Bedrock, dan Vertex, ditambah Opencode Go sebagai provider baru kelas utama.",
-			"highlight2": "Pembatalan tugas yang andal: Membatalkan tugas kini benar-benar menghentikan proses yang berjalan, dengan percobaan ulang Ctrl+C otomatis untuk proses yang sulit dihentikan.",
-			"highlight3": "Perbaikan provider dan editor: Memperbaiki ID model kustom Gemini, pemotongan diff Grok, deteksi PowerShell di Windows, dan branding code action VS Code."
+			"highlight1": "Provider Moonshot dan Kimi Code — hubungkan ke model Moonshot dengan penemuan model secara langsung, atau masuk ke Kimi Code melalui alur perangkat OAuth.",
+			"highlight2": "Dukungan model terbaru — gunakan Claude Opus 5 di berbagai provider, ditambah Kimi K3, Gemini 3.6 Flash, dan MiniMax-M3.",
+			"highlight3": "Workflow lebih andal — tinggalkan subtask yang terinterupsi dengan bersih, serta indeks file Dart dan teks biasa di codebase-mu."
 		},
 		"cloudAgents": {
 			"heading": "Baru di Cloud:",

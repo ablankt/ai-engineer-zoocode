@@ -5,6 +5,7 @@ import type { ModelInfo } from "../model.js"
 
 export type AnthropicModelId = keyof typeof anthropicModels
 export const anthropicDefaultModelId: AnthropicModelId = "claude-sonnet-4-5"
+export const ANTHROPIC_API_PROTOCOL = "anthropic"
 
 export const anthropicModels = {
 	"claude-sonnet-4-6": {
@@ -27,6 +28,25 @@ export const anthropicModels = {
 				cacheReadsPrice: 0.6, // $0.60 per million tokens (>200K context)
 			},
 		],
+	},
+	"claude-sonnet-5": {
+		maxTokens: 128_000, // Overridden to 8k if `enableReasoningEffort` is false.
+		contextWindow: 1_000_000, // 1M context window native (no beta header required)
+		supportsImages: true,
+		supportsPromptCache: true,
+		inputPrice: 2.0, // $2 per million input tokens (introductory pricing through Aug 31, 2026)
+		outputPrice: 10.0, // $10 per million output tokens (introductory pricing through Aug 31, 2026)
+		cacheWritesPrice: 2.5, // $2.50 per million tokens (introductory pricing through Aug 31, 2026)
+		cacheReadsPrice: 0.2, // $0.20 per million tokens (introductory pricing through Aug 31, 2026)
+		// Sonnet 5 uses the same adaptive-thinking / binary-toggle convention as
+		// Opus 4.7+ and Fable 5 on the direct Anthropic provider path. Manual
+		// extended thinking (budget_tokens) is removed and returns a 400, and
+		// setting sampling parameters (temperature/top_p/top_k) returns a 400.
+		supportsReasoningBudget: true,
+		supportsReasoningBinary: true,
+		supportsTemperature: false,
+		description:
+			"Claude Sonnet 5 is the best combination of speed and intelligence, optimized for coding, tool use, and agentic workflows.",
 	},
 	"claude-sonnet-4-5": {
 		maxTokens: 64_000, // Overridden to 8k if `enableReasoningEffort` is false.
@@ -125,6 +145,41 @@ export const anthropicModels = {
 		// expose reasoning as a binary on/off toggle on this provider path.
 		supportsReasoningBinary: true,
 		supportsTemperature: false,
+	},
+	"claude-opus-5": {
+		maxTokens: 128_000, // Overridden to 8k if `enableReasoningEffort` is false.
+		contextWindow: 1_000_000, // 1M context window native (no beta header required)
+		supportsImages: true,
+		supportsPromptCache: true,
+		inputPrice: 5.0, // $5 per million input tokens
+		outputPrice: 25.0, // $25 per million output tokens
+		cacheWritesPrice: 6.25, // $6.25 per million tokens
+		cacheReadsPrice: 0.5, // $0.50 per million tokens
+		// Opus 5 uses the same adaptive-thinking / binary-toggle convention as
+		// Opus 4.7+ and Sonnet 5 on the direct Anthropic provider path. Manual
+		// extended thinking (budget_tokens) is removed and returns a 400, and
+		// setting sampling parameters (temperature/top_p/top_k) returns a 400.
+		supportsReasoningBudget: true,
+		supportsReasoningBinary: true,
+		supportsTemperature: false,
+		description: "Claude Opus 5 is Anthropic's most capable model for complex agentic coding and enterprise work.",
+	},
+	"claude-fable-5": {
+		maxTokens: 128_000, // Overridden to 8k if `enableReasoningEffort` is false.
+		contextWindow: 1_000_000,
+		supportsImages: true,
+		supportsPromptCache: true,
+		inputPrice: 10.0, // $10 per million input tokens
+		outputPrice: 50.0, // $50 per million output tokens
+		cacheWritesPrice: 12.5, // $12.50 per million tokens
+		cacheReadsPrice: 1.0, // $1.00 per million tokens
+		// Fable 5 uses the same adaptive-thinking / binary-toggle convention as
+		// Opus 4.7+ on the direct Anthropic provider path.
+		supportsReasoningBudget: true,
+		supportsReasoningBinary: true,
+		supportsTemperature: false,
+		description:
+			"Claude Fable 5 is Anthropic's most capable widely released model for the most demanding reasoning and long-horizon agentic work.",
 	},
 	"claude-opus-4-5-20251101": {
 		maxTokens: 32_000, // Overridden to 8k if `enableReasoningEffort` is false.

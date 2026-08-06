@@ -41,7 +41,8 @@
 		"experimental": "Thử nghiệm",
 		"language": "Ngôn ngữ",
 		"about": "Giới thiệu",
-		"skills": "Skills"
+		"skills": "Skills",
+		"rules": "Quy tắc"
 	},
 	"about": {
 		"bugReport": {
@@ -62,6 +63,24 @@
 		"debugMode": {
 			"label": "Bật chế độ debug",
 			"description": "Bật chế độ debug để hiển thị các nút bổ sung trong tiêu đề nhiệm vụ cho phép xem lịch sử hội thoại API và tin nhắn UI dưới dạng JSON được định dạng trong các tệp tạm thời."
+		},
+		"rooHistoryImport": {
+			"settingLabel": "Nhập lịch sử từ Roo Code",
+			"cardTitle": "Lịch sử Roo Code",
+			"cardDescription": "Sao chép các cuộc trò chuyện Roo Code đã lưu vào Zoo Code.",
+			"statusImporting": "Đang nhập lịch sử",
+			"statusFailed": "Nhập thất bại",
+			"statusComplete": "Nhập hoàn tất",
+			"buttonImporting": "Đang nhập từ Roo Code...",
+			"buttonIdle": "Nhập lịch sử từ Roo Code",
+			"summaryFailedWithFiles": "Đã sao chép {{copied}} trong {{total}} tệp trước khi quá trình nhập dừng lại.",
+			"summaryFailedNoFiles": "Quá trình nhập đã dừng trước khi bất kỳ tệp nào được sao chép.",
+			"summaryCopied": "Đã sao chép {{copied}} trong {{total}} tệp",
+			"detailFailed": "Bắt đầu một lần thử nhập mới để thử lại.",
+			"detailTasksImported_one": "Đã nhập {{count}} trong {{total}} lịch sử nhiệm vụ.",
+			"detailTasksImported_other": "Đã nhập {{count}} trong {{total}} lịch sử nhiệm vụ.",
+			"detailPreparing": "Đang chuẩn bị nhập lịch sử Roo Code.",
+			"progressAriaLabel": "Tiến trình nhập lịch sử Roo Code"
 		}
 	},
 	"slashCommands": {
@@ -98,6 +117,52 @@
 			"nameInvalid": "Tên chỉ có thể chứa chữ cái, số, dấu gạch ngang và dấu gạch dưới"
 		},
 		"footer": "Sử dụng lệnh slash để truy cập nhanh các prompt và quy trình công việc được sử dụng thường xuyên."
+	},
+	"rules": {
+		"description": "Quản lý các tệp quy tắc Zoo Code từ thư mục .roo/rules toàn cục và workspace. Tạo quy tắc chung hoặc quy tắc theo mode mà không cần tự duyệt các thư mục cấu hình.",
+		"workspaceRules": "Quy tắc Workspace",
+		"globalRules": "Quy tắc Toàn cục",
+		"noWorkspaceRules": "Chưa có quy tắc nào trong dự án này.",
+		"noGlobalRules": "Chưa có quy tắc toàn cục.",
+		"addRule": "Thêm Quy tắc",
+		"editRule": "Sửa quy tắc",
+		"deleteRule": "Xóa quy tắc",
+		"modeLabel": "Mode: {{mode}}",
+		"deleteDialog": {
+			"title": "Xóa Quy tắc",
+			"description": "Bạn có chắc muốn xóa quy tắc \"{{name}}\" không? Không thể hoàn tác hành động này.",
+			"confirm": "Xóa",
+			"cancel": "Hủy"
+		},
+		"createDialog": {
+			"title": "Tạo Quy tắc Mới",
+			"nameLabel": "Tên",
+			"namePlaceholder": "ten-quy-tac-cua-toi",
+			"nameHint": "Chỉ dùng chữ thường, số, dấu gạch nối và dấu gạch dưới. .md được thêm tự động.",
+			"scopeLabel": "Vị trí",
+			"kindLabel": "Loại quy tắc",
+			"modeLabel": "Mode",
+			"modePlaceholder": "Chọn mode",
+			"create": "Tạo",
+			"cancel": "Hủy"
+		},
+		"scope": {
+			"global": "Toàn cục (có trong mọi workspace)",
+			"project": "Workspace"
+		},
+		"kind": {
+			"generic": "Quy tắc chung",
+			"mode": "Quy tắc theo mode",
+			"genericBadge": "Chung",
+			"modeBadge": "Mode"
+		},
+		"validation": {
+			"nameRequired": "Tên là bắt buộc",
+			"nameTooLong": "Tên phải có 64 ký tự trở xuống",
+			"nameInvalid": "Tên chỉ được chứa chữ thường, số, dấu gạch nối và dấu gạch dưới",
+			"modeRequired": "Mode là bắt buộc cho quy tắc theo mode"
+		},
+		"footer": "Quy tắc tải hướng dẫn theo mode trước hướng dẫn chung. Quy tắc toàn cục tải trước quy tắc workspace."
 	},
 	"prompts": {
 		"description": "Cấu hình các lời nhắc hỗ trợ được sử dụng cho các hành động nhanh như cải thiện lời nhắc, giải thích mã và khắc phục sự cố. Những lời nhắc này giúp Zoo cung cấp hỗ trợ tốt hơn cho các tác vụ phát triển phổ biến."
@@ -213,11 +278,12 @@
 		"stoppingButton": "Đang dừng...",
 		"workspaceToggleLabel": "Bật lập chỉ mục cho không gian làm việc này",
 		"workspaceDisabledMessage": "Lập chỉ mục đã được cấu hình nhưng chưa được bật cho không gian làm việc này.",
-		"autoEnableDefaultLabel": "Tự động bật lập chỉ mục cho không gian làm việc mới"
+		"autoEnableDefaultLabel": "Tự động bật lập chỉ mục cho không gian làm việc mới",
+		"sembleProvider": "Semble - Cục bộ"
 	},
 	"autoApprove": {
 		"toggleShortcut": "Bạn có thể định cấu hình một phím tắt chung cho cài đặt này <SettingsLink>trong tùy chọn IDE của bạn</SettingsLink>.",
-		"description": "Cho phép Roo tự động thực hiện các hoạt động mà không cần phê duyệt. Chỉ bật những cài đặt này nếu bạn hoàn toàn tin tưởng AI và hiểu rõ các rủi ro bảo mật liên quan.",
+		"description": "Cho phép Zoo tự động thực hiện các hoạt động mà không cần phê duyệt. Chỉ bật những cài đặt này nếu bạn hoàn toàn tin tưởng AI và hiểu rõ các rủi ro bảo mật liên quan.",
 		"enabled": "Phê duyệt tự động đã bật",
 		"toggleAriaLabel": "Chuyển đổi tự động phê duyệt",
 		"disabledAriaLabel": "Tự động phê duyệt bị vô hiệu hóa - hãy chọn các tùy chọn trước",
@@ -316,6 +382,8 @@
 		"getVercelAiGatewayApiKey": "Lấy khóa API Vercel AI Gateway",
 		"opencodeGoApiKey": "Khóa API Opencode Go",
 		"getOpencodeGoApiKey": "Lấy khóa API Opencode Go",
+		"kenariApiKey": "Khóa API Kenari",
+		"getKenariApiKey": "Lấy khóa API Kenari",
 		"apiKeyStorageNotice": "Khóa API được lưu trữ an toàn trong Bộ lưu trữ bí mật của VSCode",
 		"openAiCodexRateLimits": {
 			"title": "Usage Limits for Codex{{planLabel}}",
@@ -384,11 +452,24 @@
 		"poeBaseUrl": "URL cơ sở Poe",
 		"fireworksApiKey": "Khóa API Fireworks",
 		"getFireworksApiKey": "Lấy khóa API Fireworks",
+		"friendliApiKey": "Khóa API Friendli",
+		"getFriendliApiKey": "Lấy khóa API Friendli",
 		"deepSeekApiKey": "Khóa API DeepSeek",
 		"getDeepSeekApiKey": "Lấy khóa API DeepSeek",
 		"moonshotApiKey": "Khóa API Moonshot",
 		"getMoonshotApiKey": "Lấy khóa API Moonshot",
 		"moonshotBaseUrl": "Điểm vào Moonshot",
+		"kimiCode": {
+			"authMethod": "Authentication method",
+			"oauth": "Kimi Code subscription (OAuth)",
+			"apiKey": "Kimi Code API key",
+			"apiKeyLabel": "Kimi Code API Key",
+			"signIn": "Sign in to Kimi Code",
+			"signOut": "Sign out",
+			"authenticated": "Signed in to Kimi Code",
+			"deviceCodeHelp": "Enter this device code in the Kimi authorization page:",
+			"docs": "Kimi Code documentation"
+		},
 		"zaiApiKey": "Khóa API Z AI",
 		"getZaiApiKey": "Lấy khóa API Z AI",
 		"zaiEntrypoint": "Điểm vào Z AI",
@@ -475,6 +556,8 @@
 			"apiKeyHelp": "Khóa API tùy chọn cho các phiên bản Ollama đã xác thực hoặc dịch vụ đám mây. Để trống cho cài đặt cục bộ.",
 			"numCtx": "Kích thước cửa sổ ngữ cảnh (num_ctx)",
 			"numCtxHelp": "Ghi đè kích thước cửa sổ ngữ cảnh mặc định của mô hình. Để trống để sử dụng cấu hình Modelfile của mô hình. Giá trị tối thiểu là 128.",
+			"thinking": "Bật suy luận",
+			"thinkingHelp": "Bật suy luận gốc của Ollama cho các mô hình suy luận (ví dụ: qwen3, deepseek-r1). Khi được bật, suy luận của mô hình được truyền và hiển thị riêng biệt. Các mô hình không được hỗ trợ sẽ bỏ qua cài đặt này.",
 			"description": "Ollama cho phép bạn chạy các mô hình cục bộ trên máy tính của bạn. Để biết hướng dẫn về cách bắt đầu, xem hướng dẫn nhanh của họ.",
 			"warning": "Lưu ý: Zoo Code sử dụng các lời nhắc phức tạp và hoạt động tốt nhất với các mô hình Claude. Các mô hình kém mạnh hơn có thể không hoạt động như mong đợi."
 		},
@@ -543,6 +626,7 @@
 			"minimal": "Tối thiểu (nhanh nhất)",
 			"high": "Cao",
 			"xhigh": "Rất cao",
+			"max": "Tối đa",
 			"medium": "Trung bình",
 			"low": "Thấp"
 		},
@@ -651,6 +735,12 @@
 				"description": "Thời gian chờ sau khi ghi tệp trước khi tiếp tục, cho phép các công cụ chẩn đoán xử lý các thay đổi và phát hiện sự cố."
 			}
 		},
+		"fileEdits": {
+			"diffFuzzyThreshold": {
+				"label": "Ngưỡng khớp diff",
+				"description": "Ngưỡng thấp hơn làm cho việc chỉnh sửa tệp linh hoạt hơn với các biến thể định dạng và khoảng trắng. Ngưỡng 100% yêu cầu khớp chính xác."
+			}
+		},
 		"condensingThreshold": {
 			"label": "Ngưỡng kích hoạt nén",
 			"selectProfile": "Cấu hình ngưỡng cho hồ sơ",
@@ -750,10 +840,9 @@
 			"description": "Bật tính năng này để kế thừa các biến môi trường từ quy trình mẹ của VS Code. <0>Tìm hiểu thêm</0>"
 		},
 		"profile": {
-			"label": "Ghi đè terminal Zoo Code",
-			"default": "Dùng hồ sơ mặc định của VS Code (khuyến nghị)",
-			"description": "Theo mặc định Zoo Code sử dụng shell được cấu hình trong VS Code. Chọn Ghi đè để chọn hồ sơ shell dựa trên đường dẫn được VS Code cung cấp. Các hồ sơ chỉ nguồn (ví dụ: mục PowerShell tích hợp) không thể được liệt kê ở đây. <0>Tìm hiểu thêm</0>",
-			"overrideLabel": "Ghi đè shell cho Zoo Code",
+			"label": "Hồ sơ terminal Zoo Code",
+			"followVscode": "Đang theo hồ sơ VS Code (được khuyến nghị)",
+			"description": "Theo mặc định Zoo Code sử dụng shell được cấu hình trong VS Code. Chọn một hồ sơ shell từ danh sách để chọn hồ sơ shell dựa trên đường dẫn được VS Code cung cấp. Các hồ sơ chỉ nguồn (ví dụ: mục PowerShell tích hợp) không thể được liệt kê ở đây. <0>Tìm hiểu thêm</0>",
 			"configureButton": "Chọn hồ sơ mặc định trong VS Code",
 			"noProfiles": "(không tìm thấy hồ sơ dựa trên đường dẫn trong terminal.integrated.profiles)"
 		}
@@ -984,6 +1073,18 @@
 			"label": "Cỡ chữ trò chuyện",
 			"description": "Đặt cỡ chữ (tính bằng pixel) cho cuộc trò chuyện Zoo Code. Để ở giá trị mặc định để khớp với cỡ chữ của VS Code.",
 			"reset": "Dùng mặc định của VS Code"
+		},
+		"autoCloseZooOpenedFiles": {
+			"label": "Tự động đóng các tệp do Zoo mở",
+			"description": "Khi bật, các tab trình soạn thảo mà Zoo mở tạm thời để hiển thị diff sẽ tự động đóng sau khi chấp nhận hoặc từ chối thay đổi. Các tab mà người dùng đã mở trước khi chỉnh sửa sẽ không bao giờ bị tự động đóng."
+		},
+		"autoCloseZooOpenedFilesAfterUserEdited": {
+			"label": "Tự động đóng ngay cả sau khi người dùng tương tác",
+			"description": "Khi bật, các tab do Zoo mở sẽ đóng ngay cả khi người dùng đã nhấn chuột hoặc gõ phím vào tệp hoặc diff trong phiên chỉnh sửa. Không có tác dụng nếu 'Tự động đóng các tệp do Zoo mở' bị tắt."
+		},
+		"autoCloseZooOpenedNewFiles": {
+			"label": "Tự động đóng các tệp mới tạo",
+			"description": "Khi bật, các tab của các tệp mà Zoo đã tạo (thay vì chỉnh sửa) cũng sẽ tự động đóng sau khi chấp nhận thay đổi."
 		}
 	},
 	"skills": {

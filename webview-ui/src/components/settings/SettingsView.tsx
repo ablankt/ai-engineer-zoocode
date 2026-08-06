@@ -1,6 +1,5 @@
 import React, {
 	forwardRef,
-	memo,
 	useCallback,
 	useEffect,
 	useImperativeHandle,
@@ -16,7 +15,7 @@ import {
 	Database,
 	SquareTerminal,
 	FlaskConical,
-	AlertTriangle,
+	TriangleAlert,
 	Globe,
 	Info,
 	MessageSquare,
@@ -25,16 +24,20 @@ import {
 	Glasses,
 	Plug,
 	Server,
-	Users2,
+	UsersRound,
 	ArrowLeft,
 	GitCommitVertical,
 	GraduationCap,
+	ScrollText,
 } from "lucide-react"
 
 import {
 	type ProviderSettings,
 	type ExperimentId,
 	type TelemetrySetting,
+	DEFAULT_AUTO_CLOSE_ZOO_OPENED_FILES,
+	DEFAULT_AUTO_CLOSE_ZOO_OPENED_FILES_AFTER_USER_EDITED,
+	DEFAULT_AUTO_CLOSE_ZOO_OPENED_NEW_FILES,
 	DEFAULT_CHECKPOINT_TIMEOUT_SECONDS,
 	ImageGenerationProvider,
 } from "@roo-code/types"
@@ -77,6 +80,7 @@ import { Section } from "./Section"
 import PromptsSettings from "./PromptsSettings"
 import { SlashCommandsSettings } from "./SlashCommandsSettings"
 import { SkillsSettings } from "./SkillsSettings"
+import { RulesSettings } from "./RulesSettings"
 import { UISettings } from "./UISettings"
 import ModesView from "../modes/ModesView"
 import McpView from "../mcp/McpView"
@@ -100,6 +104,7 @@ export const sectionNames = [
 	"autoApprove",
 	"slashCommands",
 	"skills",
+	"rules",
 	"checkpoints",
 	"notifications",
 	"contextManagement",
@@ -125,7 +130,7 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 	const { t } = useAppTranslation()
 
 	const extensionState = useExtensionState()
-	const { currentApiConfigName, listApiConfigMeta, uriScheme, settingsImportedAt } = extensionState
+	const { currentApiConfigName, listApiConfigMeta, uriScheme, settingsImportedAt, mode } = extensionState
 
 	const [isDiscardDialogShow, setDiscardDialogShow] = useState(false)
 	const [isChangeDetected, setChangeDetected] = useState(false)
@@ -142,6 +147,8 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 	const contentRef = useRef<HTMLDivElement | null>(null)
 
 	const prevApiConfigName = useRef(currentApiConfigName)
+	const prevMode = useRef(mode)
+	const handledSettingsImportedAt = useRef<number | undefined>(undefined)
 	const confirmDialogHandler = useRef<() => void>()
 
 	const [cachedState, setCachedState] = useState(() => extensionState)
@@ -185,6 +192,7 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 		terminalZdotdir,
 		terminalProfile,
 		writeDelayMs,
+		diffFuzzyThreshold,
 		showRooIgnoredFiles,
 		enableSubfolderRules,
 		maxImageFileSize,
@@ -205,28 +213,35 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 		includeCurrentTime,
 		includeCurrentCost,
 		maxGitStatusFiles,
+		autoCloseZooOpenedFiles,
+		autoCloseZooOpenedFilesAfterUserEdited,
+		autoCloseZooOpenedNewFiles,
 	} = cachedState
 
 	const apiConfiguration = useMemo(() => cachedState.apiConfiguration ?? {}, [cachedState.apiConfiguration])
 
 	useEffect(() => {
-		// Update only when currentApiConfigName is changed.
-		// Expected to be triggered by loadApiConfiguration/upsertApiConfiguration.
-		if (prevApiConfigName.current === currentApiConfigName) {
+		// Update when currentApiConfigName or mode changes.
+		// Expected to be triggered by loadApiConfiguration/upsertApiConfiguration or mode switch.
+		if (prevApiConfigName.current === currentApiConfigName && prevMode.current === mode) {
 			return
 		}
 
 		setCachedState((prevCachedState) => ({ ...prevCachedState, ...extensionState }))
 		prevApiConfigName.current = currentApiConfigName
+		prevMode.current = mode
 		setChangeDetected(false)
-	}, [currentApiConfigName, extensionState])
+	}, [currentApiConfigName, mode, extensionState])
 
 	// Bust the cache when settings are imported.
 	useEffect(() => {
-		if (settingsImportedAt) {
-			setCachedState((prevCachedState) => ({ ...prevCachedState, ...extensionState }))
-			setChangeDetected(false)
+		if (!settingsImportedAt || handledSettingsImportedAt.current === settingsImportedAt) {
+			return
 		}
+
+		handledSettingsImportedAt.current = settingsImportedAt
+		setCachedState((prevCachedState) => ({ ...prevCachedState, ...extensionState }))
+		setChangeDetected(false)
 	}, [settingsImportedAt, extensionState])
 
 	const setCachedStateField: SetCachedStateField<keyof ExtensionStateContextType> = useCallback((field, value) => {
@@ -392,6 +407,7 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 					enableCheckpoints: enableCheckpoints ?? false,
 					checkpointTimeout: checkpointTimeout ?? DEFAULT_CHECKPOINT_TIMEOUT_SECONDS,
 					writeDelayMs,
+					diffFuzzyThreshold,
 					terminalShellIntegrationTimeout: terminalShellIntegrationTimeout ?? 30_000,
 					terminalShellIntegrationDisabled,
 					terminalCommandDelay,
@@ -422,6 +438,10 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 					includeCurrentTime: includeCurrentTime ?? true,
 					includeCurrentCost: includeCurrentCost ?? true,
 					maxGitStatusFiles: maxGitStatusFiles ?? 0,
+					autoCloseZooOpenedFiles: autoCloseZooOpenedFiles ?? DEFAULT_AUTO_CLOSE_ZOO_OPENED_FILES,
+					autoCloseZooOpenedFilesAfterUserEdited:
+						autoCloseZooOpenedFilesAfterUserEdited ?? DEFAULT_AUTO_CLOSE_ZOO_OPENED_FILES_AFTER_USER_EDITED,
+					autoCloseZooOpenedNewFiles: autoCloseZooOpenedNewFiles ?? DEFAULT_AUTO_CLOSE_ZOO_OPENED_NEW_FILES,
 					profileThresholds,
 					imageGenerationProvider,
 					openRouterImageApiKey,
@@ -515,9 +535,10 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 	const sections: { id: SectionName; icon: LucideIcon }[] = useMemo(
 		() => [
 			{ id: "providers", icon: Plug },
-			{ id: "modes", icon: Users2 },
+			{ id: "modes", icon: UsersRound },
 			{ id: "skills", icon: GraduationCap },
 			{ id: "slashCommands", icon: SquareSlash },
+			{ id: "rules", icon: ScrollText },
 			{ id: "autoApprove", icon: CheckCheck },
 			{ id: "mcp", icon: Server },
 			{ id: "checkpoints", icon: GitCommitVertical },
@@ -811,6 +832,9 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 						{/* Skills Section */}
 						{renderTab === "skills" && <SkillsSettings />}
 
+						{/* Rules Section */}
+						{renderTab === "rules" && <RulesSettings />}
+
 						{/* Checkpoints Section */}
 						{renderTab === "checkpoints" && (
 							<CheckpointSettings
@@ -847,6 +871,7 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 								includeDiagnosticMessages={includeDiagnosticMessages}
 								maxDiagnosticMessages={maxDiagnosticMessages}
 								writeDelayMs={writeDelayMs}
+								diffFuzzyThreshold={diffFuzzyThreshold}
 								includeCurrentTime={includeCurrentTime}
 								includeCurrentCost={includeCurrentCost}
 								maxGitStatusFiles={maxGitStatusFiles}
@@ -878,7 +903,12 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 						{renderTab === "modes" && <ModesView />}
 
 						{/* MCP Section */}
-						{renderTab === "mcp" && <McpView />}
+						{renderTab === "mcp" && (
+							<McpView
+								mcpEnabled={mcpEnabled}
+								setMcpEnabled={(value) => setCachedStateField("mcpEnabled", value)}
+							/>
+						)}
 
 						{/* Worktrees Section */}
 						{renderTab === "worktrees" && <WorktreesView />}
@@ -901,6 +931,9 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 								reasoningBlockCollapsed={reasoningBlockCollapsed ?? true}
 								enterBehavior={enterBehavior ?? "send"}
 								chatFontSize={chatFontSize ?? undefined}
+								autoCloseZooOpenedFiles={autoCloseZooOpenedFiles}
+								autoCloseZooOpenedFilesAfterUserEdited={autoCloseZooOpenedFilesAfterUserEdited}
+								autoCloseZooOpenedNewFiles={autoCloseZooOpenedNewFiles}
 								setCachedStateField={setCachedStateField}
 							/>
 						)}
@@ -945,7 +978,7 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 				<AlertDialogContent>
 					<AlertDialogHeader>
 						<AlertDialogTitle>
-							<AlertTriangle className="w-5 h-5 text-yellow-500" />
+							<TriangleAlert className="w-5 h-5 text-yellow-500" />
 							{t("settings:unsavedChangesDialog.title")}
 						</AlertDialogTitle>
 						<AlertDialogDescription>
@@ -966,4 +999,4 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 	)
 })
 
-export default memo(SettingsView)
+export default SettingsView

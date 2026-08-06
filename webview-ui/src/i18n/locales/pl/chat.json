@@ -17,7 +17,9 @@
 		"condenseContext": "Inteligentnie skondensuj kontekst",
 		"openApiHistory": "Otwórz historię API",
 		"openUiHistory": "Otwórz historię UI",
-		"backToParentTask": "Zadanie nadrzędne"
+		"backToParentTask": "Zadanie nadrzędne",
+		"waitingOnSubtask": "Oczekuje na podzadanie",
+		"goToSubtask": "Przejdź do podzadania"
 	},
 	"unpin": "Odepnij",
 	"pin": "Przypnij",
@@ -39,6 +41,14 @@
 	"startNewTask": {
 		"title": "Rozpocznij nowe zadanie",
 		"tooltip": "Rozpocznij nowe zadanie"
+	},
+	"seeNewChanges": {
+		"title": "Zobacz nowe zmiany",
+		"tooltip": "Wyświetl zmiany wprowadzone od twojego ostatniego promptu"
+	},
+	"restoreChanges": {
+		"title": "Przywróć zmiany",
+		"tooltip": "Przywróć pliki i stan zadania do twojego ostatniego promptu"
 	},
 	"proceedAnyways": {
 		"title": "Kontynuuj mimo to",
@@ -177,7 +187,7 @@
 		"current": "Bieżący"
 	},
 	"instructions": {
-		"wantsToFetch": "Roo chce pobrać szczegółowe instrukcje, aby pomóc w bieżącym zadaniu"
+		"wantsToFetch": "Zoo chce pobrać szczegółowe instrukcje, aby pomóc w bieżącym zadaniu"
 	},
 	"fileOperations": {
 		"wantsToRead": "Zoo chce przeczytać ten plik",
@@ -187,8 +197,8 @@
 		"wantsToEditOutsideWorkspace": "Zoo chce edytować ten plik poza obszarem roboczym",
 		"wantsToEditProtected": "Zoo chce edytować chroniony plik konfiguracyjny",
 		"wantsToCreate": "Zoo chce utworzyć nowy plik",
-		"wantsToSearchReplace": "Roo chce wykonać wyszukiwanie i zamianę w tym pliku",
-		"didSearchReplace": "Roo wykonał wyszukiwanie i zamianę w tym pliku",
+		"wantsToSearchReplace": "Zoo chce wykonać wyszukiwanie i zamianę w tym pliku",
+		"didSearchReplace": "Zoo wykonał wyszukiwanie i zamianę w tym pliku",
 		"wantsToInsert": "Zoo chce wstawić zawartość do tego pliku",
 		"wantsToInsertWithLineNumber": "Zoo chce wstawić zawartość do tego pliku w linii {{lineNumber}}",
 		"wantsToInsertAtEnd": "Zoo chce dodać zawartość na końcu tego pliku",
@@ -221,6 +231,7 @@
 		"abort": "Przerwij",
 		"pid": "PID: {{pid}}",
 		"exitStatus": "Zakończono ze statusem {{exitCode}}",
+		"malformedCommand": "Nieprawidlowe polecenie: blad skladni shell",
 		"manageCommands": "Polecenia zatwierdzone automatycznie",
 		"addToAllowed": "Dodaj do listy dozwolonych",
 		"removeFromAllowed": "Usuń z listy dozwolonych",
@@ -330,16 +341,11 @@
 	"announcement": {
 		"title": "Zoo Code {{version}} wydany",
 		"support": "Wesprzyj Zoo Code, dając nam gwiazdkę na <githubLink>GitHub</githubLink>.",
-		"handoff": {
-			"heading": "Roo Code wraca! Teraz jako wtyczka utrzymywana przez społeczność pod nazwą Zoo Code!!",
-			"description": "Jeśli nie jesteś na bieżąco, zespół Roo Code niedawno ogłosił, że wygasza rozwój Roo Code i archiwizuje dotychczasową pracę. Ale bez obaw — społeczność ruszyła do działania, aby kontynuować dziedzictwo Roo Code pod nową nazwą i w nowym domu! Nie jesteśmy już tylko jednym „Roo” — jesteśmy społecznością, czyli „Zoo”, jeśli wolisz. Zoo Code to wtyczka utrzymywana przez społeczność, która przejmuje pałeczkę tam, gdzie Roo Code skończył, i zobowiązujemy się zachować ducha Roo, jednocześnie wprowadzając nowe funkcje i ulepszenia. Chcemy też ogromnie podziękować całemu zespołowi Roo Code za ich niesamowitą pracę i stworzenie tak świetnego narzędzia dla deweloperów. Cieszymy się, że możemy rozwijać ich dorobek i zobaczyć, dokąd społeczność zaprowadzi Zoo Code w przyszłości!",
-			"readMore": "Zobacz nową stronę główną Zoo Code i przeczytaj pełne ogłoszenie"
-		},
 		"release": {
 			"heading": "Co nowego:",
-			"highlight1": "Claude Opus 4.8 i Opencode Go: Claude Opus 4.8 dodano dla Anthropic, Bedrock i Vertex, a Opencode Go dołączono jako nowego dostawcę pierwszej klasy.",
-			"highlight2": "Niezawodne anulowanie zadań: Anulowanie zadania teraz poprawnie kończy działający proces, z automatycznym ponowieniem Ctrl+C dla opornych procesów.",
-			"highlight3": "Poprawki dostawców i edytora: Naprawiono niestandardowe ID modeli Gemini, obcinanie diffów Grok, wykrywanie PowerShell w Windows i nazwy akcji kodu VS Code."
+			"highlight1": "Providerzy Moonshot i Kimi Code — łącz się z modelami Moonshot dzięki wykrywaniu modeli na żywo lub zaloguj się do Kimi Code przez przepływ urządzenia OAuth.",
+			"highlight2": "Obsługa najnowszych modeli — korzystaj z Claude Opus 5 u różnych providerów, a także z Kimi K3, Gemini 3.6 Flash i MiniMax-M3.",
+			"highlight3": "Bardziej niezawodne workflow — bezpiecznie porzucaj przerwane podzadania i indeksuj pliki Dart oraz pliki tekstowe w swojej bazie kodu."
 		},
 		"cloudAgents": {
 			"heading": "Nowości w chmurze:",

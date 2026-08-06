@@ -16,33 +16,35 @@
 
         ## Biz Zoo Code'uz
 
-> Roo ekibinin 🦘🦘🦘 [son duyurusunu](https://x.com/mattrubens/status/2046636598859559114) görmüş olabilirsin. Kısacası ekip, [Roomote](https://roomote.dev/) üzerine odaklanırken Roo Code'un aktif gelişimini kademeli olarak azaltıyor. Bu haber birçok Roo kullanıcısı için zordu; bu eklenti bu topluluk için çok şey ifade ediyor.
+> Roo ekibi, [Roomote](https://roomote.dev/) üzerine odaklanmak için Roo
+> Code'un aktif geliştirmesini durdurduktan sonra Zoo Code bu projenin
+> geliştirilmesini sürdürüyor. İnşa ettikleri her şey için Roo ekibine
+> teşekkürler.
 >
-> Bu eklentiye verdikleri emek için tüm Roo ekibine teşekkür etmek istiyoruz. Burada herkesin adını tek tek anmayacağız, ama hepimiz onların olağanüstü geliştiriciler ve aynı derecede inanılmaz insanlar olduğu konusunda hemfikiriz. Roo ekibine teşekkürler.
->
-> Roo kullanıcıları her türden geliyor. Bazıları bunu günlük işlerinde profesyonel olarak kullanıyor, bazılarıysa akıl almaz derecede karmaşık iş akışları tasarlamak için kullanıyor. Bazıları Roo'nun kendisini geliştirirken, bazıları da Roo'nun kullandığı modelleri geliştiriyor (tam anlamıyla meta). Demek istediğimiz şu: topluluk çok çeşitli ve bir kanguru 🦘🦘🦘 seçkin ve asil bir hayvan olsa da farklı türlerden oluşan bir "Zoo" 🐘🦡🦒🦓🦛🦧🦭🦦 bu eklentinin kullanıcı çeşitliliğini daha iyi yansıtıyor.
->
-> Bu yüzden **Zoo Code**'un bu önemli projenin geliştirilmesini sürdüreceğini duyurmak istiyoruz. Çekirdek ekip, daha önce Roo'ya katkıda bulunmuş ve bu eklentiye gerçekten önem veren geliştiricilerden oluşuyor. Model güncellemeleri yapmaya, hataları düzeltmeye ve özellikler yayınlamaya devam edeceğiz. Ama her şeyden önce, bu eklentiyi özel kılan topluluğun sesi olan seni dinlemek istiyoruz. Bu yüzden [Discord](https://discord.gg/VxfP4Vx3gX) sunucumuza, [Reddit](https://www.reddit.com/r/ZooCode) topluluğumuza katılabilir ya da [PR veya issue açabilirsin](https://github.com/Zoo-Code-Org/Zoo-Code); ama en önemlisi, topluluk olarak ilgili, bağlantıda ve aktif kalmanı istiyoruz.
+> Çekirdek ekip, daha önce Roo'ya katkıda bulunmuş ve bu eklentiye gerçekten
+> önem veren geliştiricilerden oluşuyor. Model güncellemeleri yapmaya,
+> hataları düzeltmeye ve özellikler yayınlamaya devam edeceğiz ve bu
+> eklentiyi bu kadar özel kılan topluluğu yakından dinlemeyi planlıyoruz.
+> Bize katıl:
+> [Discord](https://discord.gg/VxfP4Vx3gX),
+> [Reddit](https://www.reddit.com/r/ZooCode), ya da
+> [PR veya issue aç](https://github.com/Zoo-Code-Org/Zoo-Code).
 >
 > _-Zoo Code Team_
 
 ## Roo Code'dan Zoo Code'a geçiş
 
-Roo Code'dan Zoo Code'a geçmek için hızlı bir rehberi [Roo→Zoo geçiş rehberinde](https://docs.zoocode.dev/roo-to-zoo-migration) bulabilirsin. Geçiş sürecinde kullanıcılara elimizden geldiğince yardımcı olmak istiyoruz ve bunun için [Reddit](https://www.reddit.com/r/ZooCode) ile [Discord](https://discord.gg/VxfP4Vx3gX) topluluklarımız var. Bir sorun yaşarsan ya da sorunun olursa gel ve sor.
+Roo Code'dan Zoo Code'a geçmek için hızlı bir rehberi [Roo→Zoo geçiş rehberinde](https://docs.zoocode.dev/roo-to-zoo-migration) bulabilirsin. Geçiş sürecinde kullanıcılara elimizden geldiğince yardımcı olmak istiyoruz ve bunun için [Reddit](https://www.reddit.com/r/ZooCode) ile [Discord](https://discord.gg/VxfP4Vx3gX) topluluklarımız var. Bir sorun yaşarsan ya da soruların olursa gel ve sor.
 
-## v3.56.0'daki Yenilikler
+## v3.72.0'daki Yenilikler
 
-- Anthropic, Bedrock ve Vertex sağlayıcılarında **Claude Opus 4.8** desteği
-- **Opencode Go** yeni birinci sınıf API sağlayıcısı olarak eklendi
-- **Güvenilir görev iptali** — bir görevi iptal etmek artık çalışan işlemi doğru şekilde sonlandırıyor; inatçı işlemler için otomatik Ctrl+C yeniden denemesi
-- Gemini özel model ID'lerinin yok sayılarak varsayılana geri dönmesi düzeltildi
-- Eksik işaretçilerden kaynaklanan Grok diff kesintileri düzeltildi
-- Yapılandırılmış shell profili olmayan Windows'ta PowerShell algılama düzeltildi
-- VS Code code action'larının hâlâ Roo Code markasını göstermesi düzeltildi; tüm desteklenen dillere yerelleştirildi
-- Google Cloud Credentials alanına dosya yolu girildiğinde Vertex AI uyarısı düzeltildi
-- Altı güvenlik bağımlılık güncellemesi (diff, i18next-http-backend, fast-xml-parser, simple-git, uuid, turbo)
-
----
+- **Moonshot ve Kimi Code provider'ları** — Moonshot modellerini dinamik olarak keşfet veya OAuth cihaz akışıyla Kimi Code'da oturum aç.
+- **En yeni model desteği** — provider'lar genelinde Claude Opus 5'in yanı sıra Kimi K3, Gemini 3.6 Flash ve MiniMax-M3'ü kullan.
+- **Geliştirilmiş alt görev iş akışları** — daha güvenli görev geçmişi geçersiz kılma ve daha iyi devam ettirme kapsamıyla kesintiye uğramış alt görevleri temiz biçimde bırak.
+- **Genişletilmiş kod tabanı indeksleme** — Dart ve düz metin dosyalarını indeksle.
+- **Provider güvenilirliği** — ChatGPT OAuth ile GPT-5.6 Luna, LiteLLM reasoning content ve DeepSeek V4 görsel girdisi için düzeltmeler.
+- **Daha akıcı kurulum ve ayarlar** — Zoo Gateway oturum açma ve mod değiştirme davranışı iyileştirildi.
+- API, provider türleri, bağımlılıklar, yerelleştirme ve CI iyileştirmeleri.
 
 ## Zoo Code SİZİN İçin Ne Yapabilir?
 

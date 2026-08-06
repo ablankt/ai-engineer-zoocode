@@ -1,7 +1,13 @@
 import { Anthropic } from "@anthropic-ai/sdk"
 import OpenAI from "openai"
 
-import { isRetiredProvider, type ProviderSettings, type ModelInfo } from "@roo-code/types"
+import {
+	isRetiredProvider,
+	providerIdentifiers,
+	retiredProviderIdentifiers,
+	type ProviderSettings,
+	type ModelInfo,
+} from "@roo-code/types"
 
 import { getRouterRemovalMessage } from "../core/config/routerRemoval"
 import { ApiStream } from "./transform/stream"
@@ -20,6 +26,7 @@ import {
 	OpenAiNativeHandler,
 	DeepSeekHandler,
 	MoonshotHandler,
+	KimiCodeHandler,
 	MistralHandler,
 	VsCodeLmHandler,
 	RequestyHandler,
@@ -31,8 +38,10 @@ import {
 	SambaNovaHandler,
 	ZAiHandler,
 	FireworksHandler,
+	FriendliHandler,
 	VercelAiGatewayHandler,
 	OpencodeGoHandler,
+	KenariHandler,
 	ZooGatewayHandler,
 	MiniMaxHandler,
 	MimoHandler,
@@ -40,8 +49,17 @@ import {
 } from "./providers"
 import { NativeOllamaHandler } from "./providers/native-ollama"
 
+/**
+ * Options for completePrompt — unified with ApiHandlerCreateMessageMetadata.
+ * Uses abortSignal (not signal) to match the metadata pattern used in stream path.
+ */
+export interface CompletePromptOptions extends Pick<ApiHandlerCreateMessageMetadata, "abortSignal"> {
+	/** Optional timeout override (ms) — falls back to provider default if omitted */
+	timeoutMs?: number
+}
+
 export interface SingleCompletionHandler {
-	completePrompt(prompt: string): Promise<string>
+	completePrompt(prompt: string, options?: CompletePromptOptions): Promise<string>
 }
 
 export interface ApiHandlerCreateMessageMetadata {
@@ -90,6 +108,12 @@ export interface ApiHandlerCreateMessageMetadata {
 	 * Only applies to providers that support function calling restrictions (e.g., Gemini).
 	 */
 	allowedFunctionNames?: string[]
+	/**
+	 * Abort signal for cancelling the HTTP request mid-stream.
+	 * Passed through to AI SDK's streamText() so the underlying HTTP request is aborted
+	 * when the user clicks stop, preventing wasted API tokens/compute on the provider side.
+	 */
+	abortSignal?: AbortSignal
 }
 
 export interface ApiHandler {
@@ -100,6 +124,13 @@ export interface ApiHandler {
 	): ApiStream
 
 	getModel(): { id: string; info: ModelInfo }
+
+	/**
+	 * Optional context window for context-management / auto-condense when it must differ from
+	 * getModel().info.contextWindow. Only VS Code LM overrides it (static `maxInputTokens` vs its
+	 * inflated live window); others leave it undefined and callers fall back.
+	 */
+	getCondenseContextWindow?(): number
 
 	/**
 	 * Counts tokens for content blocks
@@ -115,7 +146,7 @@ export interface ApiHandler {
 export function buildApiHandler(configuration: ProviderSettings): ApiHandler {
 	const { apiProvider, ...options } = configuration
 
-	if (apiProvider === "roo") {
+	if (apiProvider === retiredProviderIdentifiers.roo) {
 		throw new Error(getRouterRemovalMessage())
 	}
 
@@ -126,67 +157,73 @@ export function buildApiHandler(configuration: ProviderSettings): ApiHandler {
 	}
 
 	switch (apiProvider) {
-		case "anthropic":
+		case providerIdentifiers.anthropic:
 			return new AnthropicHandler(options)
-		case "openrouter":
+		case providerIdentifiers.openrouter:
 			return new OpenRouterHandler(options)
-		case "bedrock":
+		case providerIdentifiers.bedrock:
 			return new AwsBedrockHandler(options)
-		case "vertex":
+		case providerIdentifiers.vertex:
 			return options.apiModelId?.startsWith("claude")
 				? new AnthropicVertexHandler(options)
 				: new VertexHandler(options)
-		case "openai":
+		case providerIdentifiers.openai:
 			return new OpenAiHandler(options)
-		case "ollama":
+		case providerIdentifiers.ollama:
 			return new NativeOllamaHandler(options)
-		case "lmstudio":
+		case providerIdentifiers.lmstudio:
 			return new LmStudioHandler(options)
-		case "gemini":
+		case providerIdentifiers.gemini:
 			return new GeminiHandler(options)
-		case "openai-codex":
+		case providerIdentifiers.openaiCodex:
 			return new OpenAiCodexHandler(options)
-		case "openai-native":
+		case providerIdentifiers.openaiNative:
 			return new OpenAiNativeHandler(options)
-		case "deepseek":
+		case providerIdentifiers.deepseek:
 			return new DeepSeekHandler(options)
-		case "qwen-code":
+		case providerIdentifiers.qwenCode:
 			return new QwenCodeHandler(options)
-		case "moonshot":
+		case providerIdentifiers.moonshot:
 			return new MoonshotHandler(options)
-		case "vscode-lm":
+		case providerIdentifiers.kimiCode:
+			return new KimiCodeHandler(options)
+		case providerIdentifiers.vscodeLm:
 			return new VsCodeLmHandler(options)
-		case "mistral":
+		case providerIdentifiers.mistral:
 			return new MistralHandler(options)
-		case "requesty":
+		case providerIdentifiers.requesty:
 			return new RequestyHandler(options)
-		case "unbound":
+		case providerIdentifiers.unbound:
 			return new UnboundHandler(options)
-		case "fake-ai":
+		case providerIdentifiers.fakeAi:
 			return new FakeAIHandler(options)
-		case "xai":
+		case providerIdentifiers.xai:
 			return new XAIHandler(options)
-		case "litellm":
+		case providerIdentifiers.litellm:
 			return new LiteLLMHandler(options)
-		case "sambanova":
+		case providerIdentifiers.sambanova:
 			return new SambaNovaHandler(options)
-		case "mimo":
+		case providerIdentifiers.mimo:
 			return new MimoHandler(options)
-		case "zai":
+		case providerIdentifiers.zai:
 			return new ZAiHandler(options)
-		case "fireworks":
+		case providerIdentifiers.fireworks:
 			return new FireworksHandler(options)
-		case "vercel-ai-gateway":
+		case providerIdentifiers.friendli:
+			return new FriendliHandler(options)
+		case providerIdentifiers.vercelAiGateway:
 			return new VercelAiGatewayHandler(options)
-		case "opencode-go":
+		case providerIdentifiers.opencodeGo:
 			return new OpencodeGoHandler(options)
-		case "zoo-gateway":
+		case providerIdentifiers.kenari:
+			return new KenariHandler(options)
+		case providerIdentifiers.zooGateway:
 			return new ZooGatewayHandler(options)
-		case "minimax":
+		case providerIdentifiers.minimax:
 			return new MiniMaxHandler(options)
-		case "baseten":
+		case providerIdentifiers.baseten:
 			return new BasetenHandler(options)
-		case "poe":
+		case providerIdentifiers.poe:
 			return new PoeHandler(options)
 		default:
 			return new AnthropicHandler(options)

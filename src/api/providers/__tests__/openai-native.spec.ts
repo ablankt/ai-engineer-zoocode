@@ -13,7 +13,7 @@ vitest.mock("@roo-code/telemetry", () => ({
 import { Anthropic } from "@anthropic-ai/sdk"
 import OpenAI from "openai"
 
-import { ApiProviderError } from "@roo-code/types"
+import { ApiProviderError, OpenAiServiceTier, SERVICE_TIER_KEY, serviceTiers } from "@roo-code/types"
 
 import { OpenAiNativeHandler } from "../openai-native"
 import { ApiHandlerOptions } from "../../../shared/api"
@@ -22,14 +22,34 @@ import { Package } from "../../../shared/package"
 // Mock OpenAI client - now everything uses Responses API
 const mockResponsesCreate = vitest.fn()
 
+const serviceTierPricingCases = [
+	{
+		requestedTier: OpenAiServiceTier.Default,
+		resolvedTier: OpenAiServiceTier.Priority,
+		expectedCost: 0.00275,
+	},
+	{
+		requestedTier: OpenAiServiceTier.Priority,
+		resolvedTier: OpenAiServiceTier.Flex,
+		expectedCost: 0.00055,
+	},
+	{
+		requestedTier: OpenAiServiceTier.Flex,
+		resolvedTier: OpenAiServiceTier.Default,
+		expectedCost: 0.0011,
+	},
+]
+
 vitest.mock("openai", () => {
 	return {
 		__esModule: true,
-		default: vitest.fn().mockImplementation(() => ({
-			responses: {
-				create: mockResponsesCreate,
-			},
-		})),
+		default: vitest.fn().mockImplementation(function () {
+			return {
+				responses: {
+					create: mockResponsesCreate,
+				},
+			}
+		}),
 	}
 })
 
@@ -120,6 +140,210 @@ describe("OpenAiNativeHandler", () => {
 	})
 
 	describe("createMessage", () => {
+		it.each(serviceTiers)("should include the selected %s service tier", async (serviceTier) => {
+			mockResponsesCreate.mockResolvedValue({
+				async *[Symbol.asyncIterator]() {},
+			})
+			handler = new OpenAiNativeHandler({
+				...mockOptions,
+				apiModelId: "gpt-5.6-sol",
+				openAiNativeServiceTier: serviceTier,
+			})
+
+			for await (const chunk of handler.createMessage(systemPrompt, messages)) {
+				void chunk
+			}
+
+			expect(mockResponsesCreate).toHaveBeenCalledWith(
+				expect.objectContaining({ [SERVICE_TIER_KEY]: serviceTier }),
+				expect.any(Object),
+			)
+		})
+
+		it.each(serviceTierPricingCases)(
+			"prices SDK stream usage using resolved $resolvedTier tier instead of requested $requestedTier tier",
+			async ({ requestedTier, resolvedTier, expectedCost }) => {
+				mockResponsesCreate.mockResolvedValue({
+					async *[Symbol.asyncIterator]() {
+						yield {
+							type: "response.done",
+							response: {
+								[SERVICE_TIER_KEY]: resolvedTier,
+								usage: { input_tokens: 100, output_tokens: 20 },
+							},
+						}
+					},
+				})
+				handler = new OpenAiNativeHandler({
+					...mockOptions,
+					apiModelId: "gpt-5.6-sol",
+					openAiNativeServiceTier: requestedTier,
+				})
+
+				const chunks = []
+				for await (const chunk of handler.createMessage(systemPrompt, messages)) {
+					chunks.push(chunk)
+				}
+
+				expect(chunks).toContainEqual(
+					expect.objectContaining({
+						type: "usage",
+						inputTokens: 100,
+						outputTokens: 20,
+						totalCost: expectedCost,
+					}),
+				)
+			},
+		)
+
+		it.each([
+			{
+				name: "an explicitly selected default tier",
+				modelId: "gpt-5.4" as const,
+				requestedTier: OpenAiServiceTier.Default,
+				resolvedTier: undefined,
+				expectedCost: 0.22,
+			},
+			{
+				name: "no selected service tier",
+				modelId: "gpt-5.4" as const,
+				requestedTier: undefined,
+				resolvedTier: undefined,
+				expectedCost: 0.22,
+			},
+			{
+				name: "a resolved service tier without a pricing entry",
+				modelId: "gpt-5.6-luna" as const,
+				requestedTier: OpenAiServiceTier.Default,
+				resolvedTier: OpenAiServiceTier.Priority,
+				expectedCost: 0.088,
+			},
+		])("retains standard pricing for $name", async ({ modelId, requestedTier, resolvedTier, expectedCost }) => {
+			mockResponsesCreate.mockResolvedValue({
+				async *[Symbol.asyncIterator]() {
+					yield {
+						type: "response.done",
+						response: {
+							...(resolvedTier ? { [SERVICE_TIER_KEY]: resolvedTier } : {}),
+							usage: {
+								input_tokens: 100_000,
+								output_tokens: 1_000,
+								cache_read_input_tokens: 20_000,
+							},
+						},
+					}
+				},
+			})
+			handler = new OpenAiNativeHandler({
+				...mockOptions,
+				apiModelId: modelId,
+				openAiNativeServiceTier: requestedTier,
+			})
+
+			const chunks = []
+			for await (const chunk of handler.createMessage(systemPrompt, messages)) {
+				chunks.push(chunk)
+			}
+
+			const usageChunk = chunks.find((chunk) => chunk.type === "usage")
+			expect(usageChunk).toBeDefined()
+			expect(usageChunk?.totalCost).toBeCloseTo(expectedCost, 6)
+		})
+
+		it.each(serviceTierPricingCases)(
+			"requests $requestedTier but prices manual SSE fallback usage using OpenAI's resolved $resolvedTier tier",
+			async ({ requestedTier, resolvedTier, expectedCost }) => {
+				mockResponsesCreate.mockRejectedValue(new Error("SDK not available"))
+				const mockFetch = vitest.fn().mockResolvedValue({
+					ok: true,
+					body: new ReadableStream({
+						start(controller) {
+							controller.enqueue(
+								new TextEncoder().encode(
+									`data: ${JSON.stringify({
+										type: "response.done",
+										response: {
+											[SERVICE_TIER_KEY]: resolvedTier,
+											usage: { input_tokens: 100, output_tokens: 20 },
+										},
+									})}\n\n`,
+								),
+							)
+							controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"))
+							controller.close()
+						},
+					}),
+				})
+				global.fetch = mockFetch as typeof fetch
+				handler = new OpenAiNativeHandler({
+					...mockOptions,
+					apiModelId: "gpt-5.6-sol",
+					openAiNativeServiceTier: requestedTier,
+				})
+
+				const chunks = []
+				for await (const chunk of handler.createMessage(systemPrompt, messages)) {
+					chunks.push(chunk)
+				}
+
+				const [, request] = mockFetch.mock.calls[0]
+				expect(JSON.parse(request.body)).toMatchObject({ [SERVICE_TIER_KEY]: requestedTier })
+				expect(chunks).toContainEqual(expect.objectContaining({ type: "usage", totalCost: expectedCost }))
+			},
+		)
+
+		it.each(serviceTierPricingCases)(
+			"captures resolved $resolvedTier tier from a manual SSE completion event when $requestedTier was requested",
+			async ({ requestedTier, resolvedTier, expectedCost }) => {
+				mockResponsesCreate.mockRejectedValue(new Error("SDK not available"))
+				const mockFetch = vitest.fn().mockResolvedValue({
+					ok: true,
+					body: new ReadableStream({
+						start(controller) {
+							controller.enqueue(
+								new TextEncoder().encode(
+									`data: ${JSON.stringify({
+										type: "response.completed",
+										response: { [SERVICE_TIER_KEY]: resolvedTier },
+									})}\n\n`,
+								),
+							)
+							controller.enqueue(
+								new TextEncoder().encode(
+									`data: ${JSON.stringify({
+										type: "response.usage",
+										usage: { input_tokens: 100, output_tokens: 20 },
+									})}\n\n`,
+								),
+							)
+							controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"))
+							controller.close()
+						},
+					}),
+				})
+				global.fetch = mockFetch as typeof fetch
+				handler = new OpenAiNativeHandler({
+					...mockOptions,
+					apiModelId: "gpt-5.6-sol",
+					openAiNativeServiceTier: requestedTier,
+				})
+
+				const chunks = []
+				for await (const chunk of handler.createMessage(systemPrompt, messages)) {
+					chunks.push(chunk)
+				}
+
+				expect(chunks).toContainEqual(
+					expect.objectContaining({
+						type: "usage",
+						inputTokens: 100,
+						outputTokens: 20,
+						totalCost: expectedCost,
+					}),
+				)
+			},
+		)
+
 		it("should handle streaming responses via Responses API", async () => {
 			// Mock fetch for Responses API fallback
 			const mockFetch = vitest.fn().mockResolvedValue({
@@ -219,6 +443,50 @@ describe("OpenAiNativeHandler", () => {
 			)
 		})
 
+		it.each(serviceTiers)("should include the selected %s service tier", async (serviceTier) => {
+			mockResponsesCreate.mockResolvedValue({ output: [] })
+			handler = new OpenAiNativeHandler({
+				...mockOptions,
+				apiModelId: "gpt-5.6-sol",
+				openAiNativeServiceTier: serviceTier,
+			})
+
+			await handler.completePrompt("Test prompt")
+
+			expect(mockResponsesCreate).toHaveBeenCalledWith(
+				expect.objectContaining({
+					stream: false,
+					[SERVICE_TIER_KEY]: serviceTier,
+				}),
+				expect.any(Object),
+			)
+		})
+
+		it("should omit the service tier when none is configured", async () => {
+			mockResponsesCreate.mockResolvedValue({ output: [] })
+
+			await handler.completePrompt("Test prompt")
+
+			const [request] = mockResponsesCreate.mock.calls[0]
+			expect(request.stream).toBe(false)
+			expect(request).not.toHaveProperty(SERVICE_TIER_KEY)
+		})
+
+		it("should omit a configured service tier that the model does not support", async () => {
+			mockResponsesCreate.mockResolvedValue({ output: [] })
+			handler = new OpenAiNativeHandler({
+				...mockOptions,
+				apiModelId: "gpt-5.6-luna",
+				openAiNativeServiceTier: OpenAiServiceTier.Priority,
+			})
+
+			await handler.completePrompt("Test prompt")
+
+			const [request] = mockResponsesCreate.mock.calls[0]
+			expect(request.stream).toBe(false)
+			expect(request).not.toHaveProperty(SERVICE_TIER_KEY)
+		})
+
 		it("should handle SDK errors in completePrompt", async () => {
 			// Mock SDK to throw an error
 			mockResponsesCreate.mockRejectedValue(new Error("API Error"))
@@ -265,6 +533,21 @@ describe("OpenAiNativeHandler", () => {
 			expect(modelInfo.info.maxTokens).toBe(128000)
 			expect(modelInfo.info.contextWindow).toBe(400000)
 			expect(modelInfo.info.supportsReasoningEffort).toEqual(["low", "medium", "high", "xhigh"])
+		})
+
+		it("should return GPT-5.5 model info when selected", () => {
+			const gpt55Handler = new OpenAiNativeHandler({
+				...mockOptions,
+				apiModelId: "gpt-5.5",
+			})
+
+			const modelInfo = gpt55Handler.getModel()
+			expect(modelInfo.id).toBe("gpt-5.5")
+			expect(modelInfo.info.maxTokens).toBe(128000)
+			expect(modelInfo.info.contextWindow).toBe(1_050_000)
+			expect(modelInfo.info.supportsVerbosity).toBe(true)
+			expect(modelInfo.info.supportsReasoningEffort).toEqual(["none", "low", "medium", "high", "xhigh"])
+			expect(modelInfo.info.reasoningEffort).toBe("medium")
 		})
 
 		it("should return GPT-5.4 model info when selected", () => {
@@ -315,7 +598,7 @@ describe("OpenAiNativeHandler", () => {
 			expect(modelInfo.info.longContextPricing).toBeUndefined()
 			expect(modelInfo.info.tiers).toEqual([
 				expect.objectContaining({
-					name: "flex",
+					name: OpenAiServiceTier.Flex,
 					outputPrice: 0.625,
 				}),
 			])
@@ -339,7 +622,7 @@ describe("OpenAiNativeHandler", () => {
 				openAiNativeApiKey: "test-api-key",
 			})
 			const modelInfo = handlerWithoutModel.getModel()
-			expect(modelInfo.id).toBe("gpt-5.1-codex-max") // Default model
+			expect(modelInfo.id).toBe("gpt-5.6-sol") // Default model
 			expect(modelInfo.info).toBeDefined()
 		})
 	})
@@ -428,6 +711,56 @@ describe("OpenAiNativeHandler", () => {
 			expect(textChunks).toHaveLength(2)
 			expect(textChunks[0].text).toBe("Hello")
 			expect(textChunks[1].text).toBe(" world")
+		})
+
+		it("should handle GPT-5.5 model with Responses API", async () => {
+			const mockFetch = vitest.fn().mockResolvedValue({
+				ok: true,
+				body: new ReadableStream({
+					start(controller) {
+						controller.enqueue(
+							new TextEncoder().encode(
+								'data: {"type":"response.output_item.added","item":{"type":"text","text":"GPT-5.5 reply"}}\n\n',
+							),
+						)
+						controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"))
+						controller.close()
+					},
+				}),
+			})
+			global.fetch = mockFetch as any
+
+			mockResponsesCreate.mockRejectedValue(new Error("SDK not available"))
+
+			handler = new OpenAiNativeHandler({
+				...mockOptions,
+				apiModelId: "gpt-5.5",
+			})
+
+			const stream = handler.createMessage(systemPrompt, messages)
+			const chunks: any[] = []
+			for await (const chunk of stream) {
+				chunks.push(chunk)
+			}
+
+			expect(mockFetch).toHaveBeenCalledWith(
+				"https://api.openai.com/v1/responses",
+				expect.objectContaining({
+					body: expect.any(String),
+				}),
+			)
+			const body = (mockFetch.mock.calls[0][1] as any).body as string
+			const parsedBody = JSON.parse(body)
+			expect(parsedBody.model).toBe("gpt-5.5")
+			expect(parsedBody.max_output_tokens).toBe(128000)
+			expect(parsedBody.temperature).toBeUndefined()
+			expect(parsedBody.include).toEqual(["reasoning.encrypted_content"])
+			expect(parsedBody.reasoning?.effort).toBe("medium")
+			expect(parsedBody.text?.verbosity).toBe("medium")
+
+			const textChunks = chunks.filter((chunk) => chunk.type === "text")
+			expect(textChunks).toHaveLength(1)
+			expect(textChunks[0].text).toBe("GPT-5.5 reply")
 		})
 
 		it("should handle GPT-5.4 model with Responses API", async () => {
@@ -1775,6 +2108,102 @@ describe("GPT-5 streaming event coverage (additional)", () => {
 				expect(parsedBody.model).toBe("gpt-4o")
 				expect(parsedBody.text).toBeUndefined()
 				expect(bodyStr).not.toContain('"verbosity"')
+			})
+		})
+	})
+
+	describe("URL image handling", () => {
+		it("should skip URL-sourced images in formatFullConversation (only base64 emits input_image)", async () => {
+			const mockFetch = vitest.fn().mockResolvedValue({
+				ok: true,
+				body: new ReadableStream({
+					start(controller) {
+						controller.enqueue(
+							new TextEncoder().encode('data: {"type":"response.output_text.delta","delta":"ok"}\n\n'),
+						)
+						controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"))
+						controller.close()
+					},
+				}),
+			})
+			global.fetch = mockFetch as any
+
+			mockResponsesCreate.mockRejectedValue(new Error("SDK not available"))
+
+			const localHandler = new OpenAiNativeHandler({
+				apiModelId: "gpt-4.1",
+				openAiNativeApiKey: "test-api-key",
+			})
+
+			const urlImageMessages: Anthropic.Messages.MessageParam[] = [
+				{
+					role: "user",
+					content: [
+						{ type: "text", text: "Look at this:" },
+						{
+							type: "image",
+							source: { type: "url", url: "https://example.com/img.png" } as any,
+						},
+					],
+				},
+			]
+
+			const stream = localHandler.createMessage("You are a helpful assistant.", urlImageMessages)
+			for await (const _ of stream) {
+				// consume
+			}
+
+			const bodyStr = (mockFetch.mock.calls[0][1] as any).body as string
+			const parsedBody = JSON.parse(bodyStr)
+			// URL image is skipped; only the text part is in the input
+			const userMsg = parsedBody.input[0]
+			expect(userMsg.content).toEqual([{ type: "input_text", text: "Look at this:" }])
+			expect(bodyStr).not.toContain("input_image")
+		})
+
+		it("should emit input_image for base64 images in formatFullConversation", async () => {
+			const mockFetch = vitest.fn().mockResolvedValue({
+				ok: true,
+				body: new ReadableStream({
+					start(controller) {
+						controller.enqueue(
+							new TextEncoder().encode('data: {"type":"response.output_text.delta","delta":"ok"}\n\n'),
+						)
+						controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"))
+						controller.close()
+					},
+				}),
+			})
+			global.fetch = mockFetch as any
+
+			mockResponsesCreate.mockRejectedValue(new Error("SDK not available"))
+
+			const localHandler = new OpenAiNativeHandler({
+				apiModelId: "gpt-4.1",
+				openAiNativeApiKey: "test-api-key",
+			})
+
+			const b64ImageMessages: Anthropic.Messages.MessageParam[] = [
+				{
+					role: "user",
+					content: [
+						{ type: "text", text: "Look at this:" },
+						{ type: "image", source: { type: "base64", media_type: "image/png", data: "abc123" } },
+					],
+				},
+			]
+
+			const stream = localHandler.createMessage("You are a helpful assistant.", b64ImageMessages)
+			for await (const _ of stream) {
+				// consume
+			}
+
+			const bodyStr = (mockFetch.mock.calls[0][1] as any).body as string
+			const parsedBody = JSON.parse(bodyStr)
+			const userMsg = parsedBody.input[0]
+			expect(userMsg.content).toContainEqual({
+				type: "input_image",
+				image_url: "data:image/png;base64,abc123",
 			})
 		})
 	})

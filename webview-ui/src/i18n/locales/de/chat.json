@@ -17,7 +17,9 @@
 		"condenseContext": "Kontext intelligent komprimieren",
 		"openApiHistory": "API-Verlauf öffnen",
 		"openUiHistory": "UI-Verlauf öffnen",
-		"backToParentTask": "Übergeordnete Aufgabe"
+		"backToParentTask": "Übergeordnete Aufgabe",
+		"waitingOnSubtask": "Wartet auf Unteraufgabe",
+		"goToSubtask": "Zur Unteraufgabe"
 	},
 	"unpin": "Lösen von oben",
 	"pin": "Anheften",
@@ -39,6 +41,14 @@
 	"startNewTask": {
 		"title": "Neue Aufgabe starten",
 		"tooltip": "Beginne eine neue Aufgabe"
+	},
+	"seeNewChanges": {
+		"title": "Neue Änderungen ansehen",
+		"tooltip": "Zeige Änderungen seit deinem letzten Prompt"
+	},
+	"restoreChanges": {
+		"title": "Änderungen wiederherstellen",
+		"tooltip": "Stelle Dateien und Aufgabenstatus auf deinen letzten Prompt zurück"
 	},
 	"proceedAnyways": {
 		"title": "Trotzdem fortfahren",
@@ -120,7 +130,7 @@
 		"title": "Modi",
 		"marketplace": "Modus-Marketplace",
 		"settings": "Modus-Einstellungen",
-		"description": "Spezialisierte Personas, die Roos Verhalten anpassen.",
+		"description": "Spezialisierte Personas, die Zoos Verhalten anpassen.",
 		"searchPlaceholder": "Modi suchen...",
 		"noResults": "Keine Ergebnisse gefunden"
 	},
@@ -177,7 +187,7 @@
 		"current": "Aktuell"
 	},
 	"instructions": {
-		"wantsToFetch": "Roo möchte detaillierte Anweisungen abrufen, um bei der aktuellen Aufgabe zu helfen"
+		"wantsToFetch": "Zoo möchte detaillierte Anweisungen abrufen, um bei der aktuellen Aufgabe zu helfen"
 	},
 	"fileOperations": {
 		"wantsToRead": "Zoo möchte diese Datei lesen",
@@ -188,8 +198,8 @@
 		"wantsToEditOutsideWorkspace": "Zoo möchte diese Datei außerhalb des Arbeitsbereichs bearbeiten",
 		"wantsToEditProtected": "Zoo möchte eine geschützte Konfigurationsdatei bearbeiten",
 		"wantsToCreate": "Zoo möchte eine neue Datei erstellen",
-		"wantsToSearchReplace": "Roo möchte in dieser Datei suchen und ersetzen",
-		"didSearchReplace": "Roo hat Suchen und Ersetzen in dieser Datei durchgeführt",
+		"wantsToSearchReplace": "Zoo möchte in dieser Datei suchen und ersetzen",
+		"didSearchReplace": "Zoo hat Suchen und Ersetzen in dieser Datei durchgeführt",
 		"wantsToInsert": "Zoo möchte Inhalte in diese Datei einfügen",
 		"wantsToInsertWithLineNumber": "Zoo möchte Inhalte in diese Datei in Zeile {{lineNumber}} einfügen",
 		"wantsToInsertAtEnd": "Zoo möchte Inhalte am Ende dieser Datei anhängen",
@@ -221,6 +231,7 @@
 		"running": "Wird ausgeführt",
 		"pid": "PID: {{pid}}",
 		"exitStatus": "Beendet mit Status {{exitCode}}",
+		"malformedCommand": "Fehlerhafter Befehl: Shell-Syntaxfehler",
 		"manageCommands": "Automatisch genehmigte Befehle",
 		"addToAllowed": "Zur erlaubten Liste hinzufügen",
 		"removeFromAllowed": "Von der erlaubten Liste entfernen",
@@ -277,7 +288,7 @@
 		"copyToClipboard": "In Zwischenablage kopieren",
 		"copied": "Kopiert!",
 		"diagnostics": "Detaillierte Fehlerinformationen abrufen",
-		"proxyProvider": "Du scheinst einen Proxy-basierten Anbieter zu verwenden. Überprüfe unbedingt seine Protokolle und stelle sicher, dass er Roos Anfragen nicht umschreibt."
+		"proxyProvider": "Du scheinst einen Proxy-basierten Anbieter zu verwenden. Überprüfe unbedingt seine Protokolle und stelle sicher, dass er Zoos Anfragen nicht umschreibt."
 	},
 	"powershell": {
 		"issues": "Es scheint, dass du Probleme mit Windows PowerShell hast, bitte sieh dir dies an"
@@ -330,16 +341,11 @@
 	"announcement": {
 		"title": "Zoo Code {{version}} veröffentlicht",
 		"support": "Bitte unterstütze Zoo Code, indem du uns auf <githubLink>GitHub</githubLink> einen Stern gibst.",
-		"handoff": {
-			"heading": "Roo Code ist zurück! Jetzt als Community-gepflegtes Plugin namens Zoo Code!!",
-			"description": "Falls du es nicht mitbekommen hast: Das Roo Code Team hat vor Kurzem angekündigt, die Entwicklung von Roo Code einzustellen und die bisherige Arbeit zu archivieren. Aber keine Sorge: Die Community ist eingesprungen, um das Vermächtnis von Roo Code unter neuem Namen und in einem neuen Zuhause weiterzuführen! Wir sind nicht mehr nur ein einzelnes \"Roo\", sondern eine Community – ein \"Zoo\", wenn du so willst. Zoo Code ist ein Community-gepflegtes Plugin, das dort weitermacht, wo Roo Code aufgehört hat. Wir wollen den Geist von Roo bewahren und gleichzeitig neue Funktionen und Verbesserungen einführen. Dem gesamten Roo Code Team gilt ein riesiges Dankeschön für die unglaubliche Arbeit und dafür, dass es so ein großartiges Tool für Entwickler geschaffen hat. Wir freuen uns darauf, auf diesem Fundament weiterzubauen und zu sehen, wohin die Community Zoo Code in Zukunft führt!",
-			"readMore": "Sieh dir die neue Zoo Code Startseite an und lies die vollständige Ankündigung"
-		},
 		"release": {
 			"heading": "Was ist neu:",
-			"highlight1": "Claude Opus 4.8 und Opencode Go: Claude Opus 4.8 wurde für Anthropic, Bedrock und Vertex hinzugefügt, plus Opencode Go als neuer vollwertiger Provider.",
-			"highlight2": "Zuverlässiger Task-Abbruch: Das Abbrechen einer Aufgabe beendet jetzt korrekt den laufenden Prozess, mit automatischem Ctrl+C-Retry für hartnäckige Prozesse.",
-			"highlight3": "Provider- und Editor-Fixes: Behoben wurden benutzerdefinierte Gemini-Modell-IDs, abgeschnittene Grok-Diffs, PowerShell-Erkennung unter Windows und die VS Code-Code-Action-Benennung."
+			"highlight1": "Moonshot- und Kimi-Code-Anbieter — verbinde dich dank Live-Modellerkennung mit Moonshot-Modellen oder melde dich über den OAuth-Gerätefluss bei Kimi Code an.",
+			"highlight2": "Unterstützung für die neuesten Modelle — nutze Claude Opus 5 anbieterübergreifend sowie Kimi K3, Gemini 3.6 Flash und MiniMax-M3.",
+			"highlight3": "Zuverlässigere Workflows — brich unterbrochene Unteraufgaben sauber ab und indiziere Dart- und Klartextdateien in deiner Codebasis."
 		},
 		"cloudAgents": {
 			"heading": "Neu in der Cloud:",

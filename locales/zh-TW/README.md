@@ -16,13 +16,15 @@
 
         ## 我們是 Zoo Code
 
-> 你可能已經看到 Roo 團隊 🦘🦘🦘 的[最近公告](https://x.com/mattrubens/status/2046636598859559114)。簡單來說，團隊在把重心放到 [Roomote](https://roomote.dev/) 的同時，正在逐步減少 Roo Code 的活躍開發。這個消息讓很多 Roo 使用者都很難受；這個外掛對這個社群意義重大。
+> 在 Roo 團隊停止 Roo Code 的積極開發、轉而專注於 [Roomote](https://roomote.dev/)
+> 之後，Zoo Code 將繼續開發這個專案。感謝 Roo 團隊所建立的一切。
 >
-> 我們想感謝整個 Roo 團隊為這個外掛投入的努力。這裡不會逐一點名，但大家都能認同，他們既是卓越的開發者，也是同樣令人敬佩的優秀的人。感謝 Roo 團隊。
->
-> Roo 使用者來自各種不同背景。有人在日常工作中專業使用它，也有人用它來構思難以想像的複雜 workflow。有人用它來改進 Roo 本身，也有人用它來改進 Roo 所使用的模型（超級 meta）。我們想表達的是，這個社群非常多元。雖然袋鼠 🦘🦘🦘 是高貴又有代表性的動物，但我們覺得由不同物種組成的「Zoo」🐘🦡🦒🦓🦛🦧🦭🦦 更能反映這個外掛使用者的多樣性。
->
-> 因此我們想宣布，**Zoo Code** 將繼續開發這個重要專案。核心團隊由先前曾為 Roo 做出貢獻、並且非常在乎這個外掛的開發者所組成。我們會持續更新模型、修正 bug，並推出新功能。但最重要的是，我們想傾聽你們——讓這個外掛如此特別的社群。歡迎加入我們的 [Discord](https://discord.gg/VxfP4Vx3gX)、[Reddit](https://www.reddit.com/r/ZooCode)，或是[建立 PR 或 issue](https://github.com/Zoo-Code-Org/Zoo-Code)；但更重要的是，我們希望你能繼續作為社群的一分子，保持參與、保持連結、保持活躍。
+> 核心團隊由先前曾為 Roo 做出貢獻、並且非常在乎這個外掛的開發者所組成。
+> 我們會持續更新模型、修正 bug，並推出新功能，也計劃仔細傾聽讓這個外掛
+> 如此特別的社群。歡迎加入我們，一起在
+> [Discord](https://discord.gg/VxfP4Vx3gX)、
+> [Reddit](https://www.reddit.com/r/ZooCode)，或是
+> [建立 PR 或 issue](https://github.com/Zoo-Code-Org/Zoo-Code)。
 >
 > _-Zoo Code Team_
 
@@ -30,19 +32,15 @@
 
 你可以在 [Roo→Zoo 遷移指南](https://docs.zoocode.dev/roo-to-zoo-migration) 中找到從 Roo Code 遷移到 Zoo Code 的快速說明。我們希望在大家轉移過程中盡可能提供協助，這也是我們設立 [Reddit](https://www.reddit.com/r/ZooCode) 和 [Discord](https://discord.gg/VxfP4Vx3gX) 社群的原因。如果你遇到問題或有任何疑問，歡迎加入後直接提問。
 
-## v3.56.0 新功能
+## v3.72.0 新功能
 
-- 為 Anthropic、Bedrock 和 Vertex 供應商新增 **Claude Opus 4.8** 支援
-- 新增 **Opencode Go** 作為一等 API 供應商
-- **可靠的任務取消** — 取消任務現在會正確終止正在執行的程序，對於頑固程序還會自動重試 Ctrl+C
-- 修正 Gemini 自訂模型 ID 被忽略並退回預設值的問題
-- 修正因缺少標記導致的 Grok diff 截斷問題
-- 修正 Windows 上未設定 shell 設定檔時 PowerShell 偵測失敗的問題
-- 修正 VS Code 程式碼動作仍顯示 Roo Code 品牌名稱的問題；已本地化為所有支援的語言
-- 修正 Google Cloud 憑證欄位收到檔案路徑時 Vertex AI 的錯誤警告
-- 六項安全性相依套件更新（diff、i18next-http-backend、fast-xml-parser、simple-git、uuid、turbo）
-
----
+- **Moonshot 與 Kimi Code 供應商** — 動態探索 Moonshot 模型，或使用 OAuth 裝置流程登入 Kimi Code。
+- **最新模型支援** — 跨供應商使用 Claude Opus 5，以及 Kimi K3、Gemini 3.6 Flash 與 MiniMax-M3。
+- **改善的子任務工作流程** — 乾淨地放棄中斷的子任務，並透過更安全的任務歷史失效機制與更完整的恢復測試提升可靠性。
+- **擴充程式碼庫索引** — 為 Dart 與純文字檔案建立索引。
+- **供應商可靠性** — 修正 ChatGPT OAuth 下的 GPT-5.6 Luna、LiteLLM reasoning content 與 DeepSeek V4 圖片輸入問題。
+- **更順暢的設定體驗** — 改善 Zoo Gateway 登入與模式切換行為。
+- API、供應商類型、相依套件、本地化與 CI 改善。
 
 ## Zoo Code 能為您做什麼？
 

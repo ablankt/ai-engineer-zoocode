@@ -12,6 +12,7 @@ import { Task } from "../task/Task"
 import { ToolUse, ToolResponse } from "../../shared/tools"
 import { formatResponse } from "../prompts/responses"
 import { unescapeHtmlEntities } from "../../utils/text-normalization"
+import { parseCommand } from "../../shared/parse-command"
 import {
 	ExitCodeDetails,
 	RooTerminalCallbacks,
@@ -33,6 +34,15 @@ export { ShellIntegrationError } from "../../integrations/terminal/types"
 export function canRetryShellIntegrationError(error: unknown): error is ShellIntegrationError {
 	return error instanceof ShellIntegrationError && !error.commandSubmitted
 }
+
+/**
+ * Grace period before a foreground command may trigger a `command_output` ask.
+ * Short commands that emit output and exit within this window never prompt the
+ * user; the ask only fires when the command is still running once the delay
+ * elapses, so users can still interrupt or provide feedback on long-running
+ * commands.
+ */
+export const COMMAND_OUTPUT_ASK_DELAY_MS = 5_000
 
 export function getTerminalProviderForExecution(terminalShellIntegrationDisabled: boolean): {
 	terminalProvider: RooTerminalProvider
@@ -85,6 +95,25 @@ export class ExecuteCommandTool extends BaseTool<"execute_command"> {
 			}
 
 			task.consecutiveMistakeCount = 0
+
+			// Detect shell syntax errors (unterminated quotes, unclosed heredocs) before
+			// presenting the command for approval. Surfacing this as a tool error gives
+			// the agent a precise, actionable message so it can retry with a corrected
+			// command, rather than receiving a generic denial from the approval dialog.
+			const { parseError } = parseCommand(canonicalCommand)
+			if (parseError !== null) {
+				const executionId = task.lastMessageTs?.toString() ?? Date.now().toString()
+				const provider = await task.providerRef.deref()
+				const errorStatus: CommandExecutionStatus = {
+					executionId,
+					status: "error",
+					message: parseError.message,
+				}
+				provider?.postMessageToWebview({ type: "commandExecutionStatus", text: JSON.stringify(errorStatus) })
+				task.didToolFailInCurrentTurn = true
+				pushToolResult(formatResponse.toolError(parseError.message))
+				return
+			}
 
 			const didApprove = await askApproval("command", canonicalCommand)
 
@@ -315,11 +344,62 @@ export async function executeCommandInTerminal(
 	// Track when onCompleted callback finishes to avoid race condition.
 	// The callback is async but Terminal/ExecaTerminal don't await it, so we track completion
 	// explicitly to ensure persistedResult is set before we use it.
-	let onCompletedPromise: Promise<void> | undefined
 	let resolveOnCompleted: (() => void) | undefined
-	onCompletedPromise = new Promise((resolve) => {
+	const onCompletedPromise = new Promise<void>((resolve) => {
 		resolveOnCompleted = resolve
 	})
+
+	// Delay the `command_output` ask so short foreground commands that emit
+	// output and exit normally never prompt the user. The ask only fires if the
+	// command is still running once COMMAND_OUTPUT_ASK_DELAY_MS has elapsed
+	// since execution started, preserving the interrupt/feedback path for
+	// long-running commands. The anchor is re-based to onShellExecutionStarted
+	// (falling back to the pre-runCommand timestamp when that event never
+	// fires) so shell-integration startup on cold terminals does not consume
+	// the grace period.
+	let commandStartedAt = 0
+	let commandOutputAskTimer: NodeJS.Timeout | undefined
+
+	const askForCommandOutput = async (process: RooTerminalProcess): Promise<void> => {
+		if (runInBackground || hasAskedForCommandOutput || completed) {
+			return
+		}
+
+		// Mark that we've asked to prevent multiple concurrent asks
+		hasAskedForCommandOutput = true
+
+		try {
+			const { response, text, images } = await task.ask("command_output", "")
+			runInBackground = true
+
+			if (response === "messageResponse") {
+				message = { text, images }
+			}
+
+			// Any answer means the command should keep running in the background;
+			// continue the process so the tool resolves now instead of blocking
+			// until the command actually completes.
+			process.continue()
+		} catch (_error) {
+			// Silently handle ask errors (e.g., "Current ask promise was ignored")
+		}
+	}
+
+	const scheduleCommandOutputAsk = (process: RooTerminalProcess): void => {
+		if (runInBackground || hasAskedForCommandOutput || completed || commandOutputAskTimer) {
+			return
+		}
+
+		const remainingDelay = COMMAND_OUTPUT_ASK_DELAY_MS - (Date.now() - commandStartedAt)
+
+		commandOutputAskTimer = setTimeout(
+			() => {
+				commandOutputAskTimer = undefined
+				void askForCommandOutput(process)
+			},
+			Math.max(remainingDelay, 0),
+		)
+	}
 
 	const callbacks: RooTerminalCallbacks = {
 		onLine: async (lines: string, process: RooTerminalProcess) => {
@@ -340,54 +420,67 @@ export async function executeCommandInTerminal(
 			provider?.postMessageToWebview({ type: "commandExecutionStatus", text: JSON.stringify(status) })
 			schedulePartialCommandOutputUpdate()
 
-			if (runInBackground || hasAskedForCommandOutput) {
-				return
-			}
-
-			// Mark that we've asked to prevent multiple concurrent asks
-			hasAskedForCommandOutput = true
-
-			try {
-				const { response, text, images } = await task.ask("command_output", "")
-				runInBackground = true
-
-				if (response === "messageResponse") {
-					message = { text, images }
-					process.continue()
-				}
-			} catch (_error) {
-				// Silently handle ask errors (e.g., "Current ask promise was ignored")
-			}
+			scheduleCommandOutputAsk(process)
 		},
 		onCompleted: async (output: string | undefined) => {
-			try {
-				clearTimeout(pendingCommandOutputEmitTimer)
-				pendingCommandOutputEmitTimer = undefined
+			clearTimeout(commandOutputAskTimer)
+			commandOutputAskTimer = undefined
 
+			// If an interactive command_output ask is still pending, supersede it
+			// so it resolves immediately instead of lingering until the next
+			// interactive message bumps lastMessageTs.
+			if (hasAskedForCommandOutput && !runInBackground) {
+				task.supersedePendingAsk()
+			}
+
+			clearTimeout(pendingCommandOutputEmitTimer)
+			pendingCommandOutputEmitTimer = undefined
+
+			try {
 				// Finalize interceptor and get persisted result.
 				// We await finalize() to ensure the artifact file is fully flushed
 				// before we advertise the artifact_id to the LLM.
 				if (interceptor) {
 					persistedResult = await interceptor.finalize()
 				}
-
-				// Continue using compressed output for UI display
-				result = Terminal.compressTerminalOutput(output ?? "")
-				latestCompressedOutput = result
-
-				// Preserve order: wait for queued partial updates, then emit the final
-				// non-partial command_output update.
-				await commandOutputSayChain
-				await queueCommandOutputMessage(result, false, true)
-				completed = true
-			} finally {
-				// Signal that onCompleted has finished, so the main code can safely use persistedResult
-				resolveOnCompleted?.()
+			} catch (error) {
+				console.error("[ExecuteCommandTool] interceptor.finalize() failed:", error)
 			}
+
+			// Continue using compressed output for UI display
+			result = Terminal.compressTerminalOutput(output ?? "")
+			latestCompressedOutput = result
+			completed = true
+
+			// Unblock the main code path: persistedResult, result, and completed are
+			// all set now. Resolve before draining the UI say chain so that a stalled
+			// or slow webview update cannot prevent the tool result from being returned.
+			resolveOnCompleted?.()
+
+			// Preserve order: wait for queued partial updates, then emit the final
+			// non-partial command_output update. Fire-and-forget from the main path —
+			// errors here are UI-only and must not surface to the tool result.
+			commandOutputSayChain
+				.then(() => queueCommandOutputMessage(result, false, true))
+				.catch((error) => {
+					console.error("[ExecuteCommandTool] Failed to flush final command_output:", error)
+				})
 		},
-		onShellExecutionStarted: (pid: number | undefined) => {
+		onShellExecutionStarted: (pid: number | undefined, process: RooTerminalProcess) => {
 			const status: CommandExecutionStatus = { executionId, status: "started", pid, command }
 			provider?.postMessageToWebview({ type: "commandExecutionStatus", text: JSON.stringify(status) })
+
+			// Re-anchor the ask delay to actual execution start so the shell
+			// integration startup wait does not count against the grace period.
+			commandStartedAt = Date.now()
+
+			// Output should not precede this event, but if it did, reschedule
+			// the pending ask against the corrected anchor.
+			if (commandOutputAskTimer) {
+				clearTimeout(commandOutputAskTimer)
+				commandOutputAskTimer = undefined
+				scheduleCommandOutputAsk(process)
+			}
 		},
 		onShellExecutionComplete: (details: ExitCodeDetails) => {
 			const status: CommandExecutionStatus = { executionId, status: "exited", exitCode: details.exitCode }
@@ -414,6 +507,8 @@ export async function executeCommandInTerminal(
 		workingDir = terminal.getCurrentWorkingDirectory()
 	}
 
+	// Fallback anchor for providers that never fire onShellExecutionStarted.
+	commandStartedAt = Date.now()
 	const process = terminal.runCommand(command, callbacks)
 	task.terminalProcess = process
 
@@ -435,6 +530,8 @@ export async function executeCommandInTerminal(
 				new Promise<void>((resolve) => {
 					agentTimeoutId = setTimeout(() => {
 						runInBackground = true
+						clearTimeout(commandOutputAskTimer)
+						commandOutputAskTimer = undefined
 						process.continue()
 						task.supersedePendingAsk()
 						resolve()
@@ -474,6 +571,7 @@ export async function executeCommandInTerminal(
 	} finally {
 		clearTimeout(agentTimeoutId)
 		clearTimeout(userTimeoutId)
+		clearTimeout(commandOutputAskTimer)
 		clearTimeout(pendingCommandOutputEmitTimer)
 		task.terminalProcess = undefined
 	}
@@ -489,10 +587,12 @@ export async function executeCommandInTerminal(
 	// grouping command_output messages despite any gaps anyways).
 	await delay(50)
 
-	// Wait for onCompleted callback to finish if shell execution completed.
-	// This ensures persistedResult is set before we try to use it, fixing the race
-	// condition where exitDetails is set (sync) before the async onCompleted finishes.
-	if (exitDetails && onCompletedPromise) {
+	// Wait for onCompleted callback to finish. onCompleted is async and sets
+	// `completed` and `persistedResult`; we must not read them until it resolves.
+	// Skip when returning a background result: the command is still running and
+	// onCompleted will fire later — awaiting it here would block until real completion,
+	// defeating the purpose of the agent-timeout background transition.
+	if (!runInBackground) {
 		await onCompletedPromise
 	}
 

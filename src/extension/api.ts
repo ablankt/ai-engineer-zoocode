@@ -192,7 +192,7 @@ export class API extends EventEmitter<RooCodeEvents> implements RooCodeAPI {
 			provider = this.sidebarProvider
 		}
 
-		await provider.removeClineFromStack()
+		await provider.evictCurrentTask()
 		await provider.postStateToWebview()
 		await provider.postMessageToWebview({ type: "action", action: "chatButtonClicked" })
 		await provider.postMessageToWebview({ type: "invoke", invoke: "newChat", text, images })
@@ -235,18 +235,36 @@ export class API extends EventEmitter<RooCodeEvents> implements RooCodeAPI {
 		}
 	}
 
+	public async getTaskHistoryItem(taskId: string) {
+		const item = this.sidebarProvider.taskHistoryStore.get(taskId)
+		return item ? structuredClone(item) : undefined
+	}
+
+	public async getTaskApiConversationHistoryLength(taskId: string): Promise<number> {
+		try {
+			const { apiConversationHistory } = await this.sidebarProvider.getTaskWithId(taskId)
+			return apiConversationHistory.length
+		} catch {
+			return 0
+		}
+	}
+
 	public getCurrentTaskStack() {
 		return this.sidebarProvider.getCurrentTaskStack()
 	}
 
 	public async clearCurrentTask(_lastMessage?: string) {
 		// Legacy finishSubTask removed; clear current by closing active task instance.
-		await this.sidebarProvider.removeClineFromStack()
+		await this.sidebarProvider.evictCurrentTask()
 		await this.sidebarProvider.postStateToWebview()
 	}
 
 	public async cancelCurrentTask() {
 		await this.sidebarProvider.cancelTask()
+	}
+
+	public async abandonSubtask(childTaskId: string): Promise<boolean> {
+		return this.sidebarProvider.abandonSubtask(childTaskId)
 	}
 
 	public async sendMessage(text?: string, images?: string[]) {
@@ -417,6 +435,17 @@ export class API extends EventEmitter<RooCodeEvents> implements RooCodeAPI {
 			// Let's go!
 
 			this.emit(RooCodeEventName.TaskCreated, task.taskId)
+		})
+
+		// Delegation events are emitted by the provider, not by individual task instances.
+		provider.on(RooCodeEventName.TaskDelegated, (parentTaskId, childTaskId) => {
+			;(this.emit as any)(RooCodeEventName.TaskDelegated, parentTaskId, childTaskId)
+		})
+		provider.on(RooCodeEventName.TaskDelegationCompleted, (parentTaskId, childTaskId, summary) => {
+			;(this.emit as any)(RooCodeEventName.TaskDelegationCompleted, parentTaskId, childTaskId, summary)
+		})
+		provider.on(RooCodeEventName.TaskDelegationResumed, (parentTaskId, childTaskId) => {
+			;(this.emit as any)(RooCodeEventName.TaskDelegationResumed, parentTaskId, childTaskId)
 		})
 	}
 

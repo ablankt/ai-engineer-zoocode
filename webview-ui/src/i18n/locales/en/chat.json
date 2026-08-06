@@ -17,7 +17,9 @@
 		"delete": "Delete Task (Shift + Click to skip confirmation)",
 		"openApiHistory": "Open API History",
 		"openUiHistory": "Open UI History",
-		"backToParentTask": "Parent task"
+		"backToParentTask": "Parent task",
+		"waitingOnSubtask": "Waiting on subtask",
+		"goToSubtask": "Go to subtask"
 	},
 	"unpin": "Unpin",
 	"pin": "Pin",
@@ -31,6 +33,14 @@
 	"startNewTask": {
 		"title": "Start New Task",
 		"tooltip": "Begin a new task"
+	},
+	"seeNewChanges": {
+		"title": "See New Changes",
+		"tooltip": "View changes made since your last prompt"
+	},
+	"restoreChanges": {
+		"title": "Restore Changes",
+		"tooltip": "Restore files and task state to your last prompt"
 	},
 	"proceedAnyways": {
 		"title": "Proceed Anyways",
@@ -264,6 +274,7 @@
 		"running": "Running",
 		"pid": "PID: {{pid}}",
 		"exitStatus": "Exited with status {{exitCode}}",
+		"malformedCommand": "Malformed command: shell syntax error",
 		"manageCommands": "Auto-approved commands",
 		"addToAllowed": "Add to allowed list",
 		"removeFromAllowed": "Remove from allowed list",
@@ -349,16 +360,11 @@
 	"announcement": {
 		"title": "Zoo Code {{version}} Released",
 		"support": "Please support Zoo Code by starring us on <githubLink>GitHub</githubLink>.",
-		"handoff": {
-			"heading": "Roo Code is back! Now as a community-maintained plugin called Zoo Code!!",
-			"description": "If you haven't been following, the Roo Code team recently announced they are sun setting the development of Roo Code and are archiving the work they have done. But fear not, the community has stepped up to continue the legacy of Roo Code with a new name and a new home! We are not just a single \"Roo\" anymore, we are a community, a \"Zoo\" if you will, Zoo Code is a community-maintained plugin that picks up where Roo Code left off, and we're committed to keeping the spirit of Roo alive while also introducing new features and improvements. We want to give a huge shoutout to the entire Roo Code team for their incredible work and for creating such an amazing tool for developers. We're excited to continue building on their foundation and to see where the community takes Zoo Code in the future!",
-			"readMore": "See the new home page of Zoo Code and read the full announcement"
-		},
 		"release": {
 			"heading": "What's New:",
-			"highlight1": "Claude Opus 4.8 and Opencode Go: Added Claude Opus 4.8 across Anthropic, Bedrock, and Vertex, plus Opencode Go as a new first-class provider.",
-			"highlight2": "Reliable task cancellation: Cancelling a task now properly terminates the running process, with automatic Ctrl+C retry for stubborn processes.",
-			"highlight3": "Provider and editor fixes: Fixed Gemini custom model IDs, Grok diff truncation, PowerShell detection on Windows, and VS Code code action branding."
+			"highlight1": "Moonshot and Kimi Code providers — connect to Moonshot models with live model discovery, or sign in to Kimi Code through its OAuth device flow.",
+			"highlight2": "Latest model support — use Claude Opus 5 across providers, plus Kimi K3, Gemini 3.6 Flash, and MiniMax-M3.",
+			"highlight3": "More reliable workflows — abandon interrupted subtasks cleanly, and index Dart and plain-text files in your codebase."
 		},
 		"cloudAgents": {
 			"heading": "New in the Cloud:",

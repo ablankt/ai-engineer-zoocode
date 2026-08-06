@@ -16,35 +16,17 @@
 
 ## We are Zoo Code
 
-> You may have seen the
-> [recent announcement](https://x.com/mattrubens/status/2046636598859559114)
-> from the Roo team 🦘🦘🦘. The TLDR is the team is winding down active Roo
-> Code development as they focus on [Roomote](https://roomote.dev/). That news
-> was difficult for many Roo users, this plugin means a lot to this community.
+> Zoo Code continues development of this project after the Roo team wound down
+> active Roo Code work to focus on [Roomote](https://roomote.dev/). Thank you
+> to the Roo team for everything they built.
 >
-> We want to thank the entire Roo team for the work they put into this plugin.
-> We won't call out each person by name here, but we can all agree they are
-> exceptional developers and, just as importantly, incredible people. Thank you
-> to the Roo team.
->
-> As Roo coders, we come in all kinds of shapes and sizes. Some of us are using
-> it professionally in our day-to-day work, some are using it to tinker and
-> scheme unimaginably complicated workflows. Some are using it to improve Roo
-> itself while others are using it to improve the very models that Roo is using
-> (super meta). The point we are making is that the community is
-> diverse, and although a kangaroo 🦘🦘🦘 is a distinguished and noble animal,
-> we felt a "Zoo" 🐘🦡🦒🦓🦛🦧🦭🦦 of different species better reflected this
-> diversity of the plugin's users.
->
-> So we would like to announce that **Zoo Code** will continue development on
-> this important project. The core team is a group of developers who contributed
-> to Roo previously and care deeply about this plugin. We will continue to make
-> model updates, fix bugs, and release features. But more than anything, we plan
-> to listen to the community that made this plugin so special. Feel free to join
-> us on [Discord](https://discord.gg/VxfP4Vx3gX),
+> The core team is a group of developers who contributed to Roo previously and
+> care deeply about this plugin. We will continue to make model updates, fix
+> bugs, and release features, and we plan to listen closely to the community
+> that made this plugin so special. Join us on
+> [Discord](https://discord.gg/VxfP4Vx3gX),
 > [Reddit](https://www.reddit.com/r/ZooCode), or
-> [open a PR or issue](https://github.com/Zoo-Code-Org/Zoo-Code), and above all,
-> please stay involved, connected, and active as a community.
+> [open a PR or issue](https://github.com/Zoo-Code-Org/Zoo-Code).
 >
 > _-Zoo Code Team_
 
@@ -53,17 +35,15 @@
 You can find a quick guide for migrating from Roo Code to Zoo Code in the [Roo→Zoo migration guide](https://docs.zoocode.dev/roo-to-zoo-migration). We plan to try and help users as they transition over, we have our [Reddit](https://www.reddit.com/r/ZooCode) and [Discord](https://discord.gg/VxfP4Vx3gX)
 for this exact support, so if you are having problems or if you have question, jump on and ask.
 
-## What's New in v3.56.0
+## What's New in v3.72.0
 
-- **Claude Opus 4.8** support across Anthropic, Bedrock, and Vertex providers
-- **Opencode Go** added as a new first-class API provider
-- **Reliable task cancellation** — cancelling a task now terminates the running process, with automatic Ctrl+C retry for stubborn processes
-- Fix Gemini custom model IDs being ignored and falling back to the default
-- Fix truncated Grok diffs caused by missing diff markers
-- Fix PowerShell detection on Windows when no shell profile is configured
-- Fix VS Code code actions still showing Roo Code branding; localized into all supported languages
-- Fix Vertex AI warning when the Google Cloud Credentials field receives a file path
-- Six security dependency updates (diff, i18next-http-backend, fast-xml-parser, simple-git, uuid, turbo)
+- **Moonshot and Kimi Code providers** — discover Moonshot models dynamically or sign in to Kimi Code through its OAuth device flow.
+- **Latest model support** — use Claude Opus 5 across providers, plus Kimi K3, Gemini 3.6 Flash, and MiniMax-M3.
+- **Improved subtask workflows** — abandon interrupted subtasks cleanly, with safer task-history invalidation and better resume coverage.
+- **Expanded codebase indexing** — index Dart and plain-text files.
+- **Provider reliability** — fixes for GPT-5.6 Luna with ChatGPT OAuth, LiteLLM reasoning content, and DeepSeek V4 image input.
+- **Smoother setup and settings** — improved Zoo Gateway sign-in and mode-switch behavior.
+- API, provider-type, dependency, localization, and CI improvements.
 
 <details>
   <summary>🌐 Available languages</summary>
@@ -86,8 +66,7 @@ for this exact support, so if you are having problems or if you have question, j
 - [Tiếng Việt](locales/vi/README.md)
 - [简体中文](locales/zh-CN/README.md)
 - [繁體中文](locales/zh-TW/README.md)
-- ...
-    </details>
+  </details>
 
 ---
 

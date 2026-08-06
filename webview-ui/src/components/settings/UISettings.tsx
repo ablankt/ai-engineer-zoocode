@@ -2,6 +2,11 @@ import { HTMLAttributes, useMemo } from "react"
 import { useAppTranslation } from "@/i18n/TranslationContext"
 import { VSCodeCheckbox } from "@vscode/webview-ui-toolkit/react"
 import { telemetryClient } from "@/utils/TelemetryClient"
+import {
+	DEFAULT_AUTO_CLOSE_ZOO_OPENED_FILES,
+	DEFAULT_AUTO_CLOSE_ZOO_OPENED_FILES_AFTER_USER_EDITED,
+	DEFAULT_AUTO_CLOSE_ZOO_OPENED_NEW_FILES,
+} from "@roo-code/types"
 
 import { SetCachedStateField } from "./types"
 import { SectionHeader } from "./SectionHeader"
@@ -18,6 +23,9 @@ interface UISettingsProps extends HTMLAttributes<HTMLDivElement> {
 	reasoningBlockCollapsed: boolean
 	enterBehavior: "send" | "newline"
 	chatFontSize?: number
+	autoCloseZooOpenedFiles?: boolean
+	autoCloseZooOpenedFilesAfterUserEdited?: boolean
+	autoCloseZooOpenedNewFiles?: boolean
 	setCachedStateField: SetCachedStateField<keyof ExtensionStateContextType>
 }
 
@@ -25,6 +33,9 @@ export const UISettings = ({
 	reasoningBlockCollapsed,
 	enterBehavior,
 	chatFontSize,
+	autoCloseZooOpenedFiles,
+	autoCloseZooOpenedFilesAfterUserEdited,
+	autoCloseZooOpenedNewFiles,
 	setCachedStateField,
 	...props
 }: UISettingsProps) => {
@@ -143,6 +154,69 @@ export const UISettings = ({
 							</div>
 							<div className="text-vscode-descriptionForeground text-sm mt-1">
 								{t("settings:ui.chatFontSize.description")}
+							</div>
+						</div>
+					</SearchableSetting>
+
+					{/* Auto-close Zoo opened files */}
+					<SearchableSetting
+						settingId="ui-auto-close-zoo-opened-files"
+						section="ui"
+						label={t("settings:ui.autoCloseZooOpenedFiles.label")}>
+						<div className="flex flex-col gap-1">
+							<VSCodeCheckbox
+								checked={autoCloseZooOpenedFiles ?? DEFAULT_AUTO_CLOSE_ZOO_OPENED_FILES}
+								onChange={(e: any) => setCachedStateField("autoCloseZooOpenedFiles", e.target.checked)}
+								data-testid="auto-close-zoo-opened-files-checkbox">
+								<span className="font-medium">{t("settings:ui.autoCloseZooOpenedFiles.label")}</span>
+							</VSCodeCheckbox>
+							<div className="text-vscode-descriptionForeground text-sm ml-5 mt-1">
+								{t("settings:ui.autoCloseZooOpenedFiles.description")}
+							</div>
+						</div>
+					</SearchableSetting>
+
+					{/* Auto-close Zoo opened files after user interaction */}
+					<SearchableSetting
+						settingId="ui-auto-close-zoo-opened-files-after-user-edited"
+						section="ui"
+						label={t("settings:ui.autoCloseZooOpenedFilesAfterUserEdited.label")}>
+						<div className="flex flex-col gap-1">
+							<VSCodeCheckbox
+								checked={
+									autoCloseZooOpenedFilesAfterUserEdited ??
+									DEFAULT_AUTO_CLOSE_ZOO_OPENED_FILES_AFTER_USER_EDITED
+								}
+								onChange={(e: any) =>
+									setCachedStateField("autoCloseZooOpenedFilesAfterUserEdited", e.target.checked)
+								}
+								data-testid="auto-close-zoo-opened-files-after-user-edited-checkbox">
+								<span className="font-medium">
+									{t("settings:ui.autoCloseZooOpenedFilesAfterUserEdited.label")}
+								</span>
+							</VSCodeCheckbox>
+							<div className="text-vscode-descriptionForeground text-sm ml-5 mt-1">
+								{t("settings:ui.autoCloseZooOpenedFilesAfterUserEdited.description")}
+							</div>
+						</div>
+					</SearchableSetting>
+
+					{/* Auto-close Zoo opened new files */}
+					<SearchableSetting
+						settingId="ui-auto-close-zoo-opened-new-files"
+						section="ui"
+						label={t("settings:ui.autoCloseZooOpenedNewFiles.label")}>
+						<div className="flex flex-col gap-1">
+							<VSCodeCheckbox
+								checked={autoCloseZooOpenedNewFiles ?? DEFAULT_AUTO_CLOSE_ZOO_OPENED_NEW_FILES}
+								onChange={(e: any) =>
+									setCachedStateField("autoCloseZooOpenedNewFiles", e.target.checked)
+								}
+								data-testid="auto-close-zoo-opened-new-files-checkbox">
+								<span className="font-medium">{t("settings:ui.autoCloseZooOpenedNewFiles.label")}</span>
+							</VSCodeCheckbox>
+							<div className="text-vscode-descriptionForeground text-sm ml-5 mt-1">
+								{t("settings:ui.autoCloseZooOpenedNewFiles.description")}
 							</div>
 						</div>
 					</SearchableSetting>

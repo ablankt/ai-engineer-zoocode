@@ -16,13 +16,18 @@
 
         ## हम हैं Zoo Code
 
-> आपने शायद Roo टीम 🦘🦘🦘 की [हाल की घोषणा](https://x.com/mattrubens/status/2046636598859559114) देखी होगी। TLDR यह है कि टीम [Roomote](https://roomote.dev/) पर focus करते हुए Roo Code का active development धीरे-धीरे बंद कर रही है। यह खबर बहुत से Roo users के लिए मुश्किल थी; यह plugin इस community के लिए बहुत मायने रखता है।
+> Roo टीम के [Roomote](https://roomote.dev/) पर focus करने के लिए Roo Code का
+> active development बंद करने के बाद, Zoo Code इस project का development
+> आगे बढ़ा रहा है। जो कुछ भी उन्होंने बनाया, उसके लिए Roo टीम का धन्यवाद।
 >
-> हम पूरे Roo टीम को इस plugin पर लगाए गए उनके काम के लिए धन्यवाद देना चाहते हैं। हम यहाँ हर व्यक्ति का नाम अलग-अलग नहीं लेंगे, लेकिन हम सब इस बात से सहमत हो सकते हैं कि वे exceptional developers हैं और, उतना ही ज़रूरी, incredible लोग भी हैं। Roo टीम को धन्यवाद।
->
-> Roo users हर तरह के हैं। कुछ लोग इसे अपने day-to-day professional काम में इस्तेमाल करते हैं, कुछ लोग इससे बेहद जटिल workflows बनाते हैं। कुछ लोग खुद Roo को बेहतर बनाते हैं, जबकि कुछ वही models बेहतर बनाते हैं जिन्हें Roo इस्तेमाल करता है (super meta)। हमारी बात बस इतनी है कि community बहुत diverse है, और जबकि kangaroo 🦘🦘🦘 एक शानदार और सम्मानित जानवर है, हमें लगा कि अलग-अलग species वाला "Zoo" 🐘🦡🦒🦓🦛🦧🦭🦦 plugin users की इस diversity को बेहतर दिखाता है।
->
-> इसलिए हम यह घोषणा करना चाहते हैं कि **Zoo Code** इस महत्वपूर्ण project का development जारी रखेगा। Core team ऐसे developers का समूह है जिन्होंने पहले Roo में योगदान दिया है और इस plugin की गहराई से परवाह करते हैं। हम models update करते रहेंगे, bugs fix करते रहेंगे और features release करते रहेंगे। लेकिन सबसे बढ़कर, हम आप community की बात सुनना चाहते हैं, जिसने इस plugin को इतना खास बनाया। इसलिए बेझिझक हमारे [Discord](https://discord.gg/VxfP4Vx3gX), हमारे [Reddit](https://www.reddit.com/r/ZooCode) से जुड़ें, या [PR या issue बनाएं](https://github.com/Zoo-Code-Org/Zoo-Code); लेकिन सबसे ज़्यादा हम आपसे यही कहेंगे कि community के रूप में जुड़े रहें, सक्रिय रहें और शामिल रहें।
+> Core team ऐसे developers का समूह है जिन्होंने पहले Roo में योगदान दिया है
+> और इस plugin की गहराई से परवाह करते हैं। हम models update करते रहेंगे,
+> bugs fix करते रहेंगे और features release करते रहेंगे, और हम उस community
+> की बात ध्यान से सुनने की योजना बना रहे हैं जिसने इस plugin को इतना खास
+> बनाया। हमारे साथ जुड़ो
+> [Discord](https://discord.gg/VxfP4Vx3gX),
+> [Reddit](https://www.reddit.com/r/ZooCode), या
+> [PR या issue खोलें](https://github.com/Zoo-Code-Org/Zoo-Code) पर।
 >
 > _-Zoo Code Team_
 
@@ -30,19 +35,15 @@
 
 Roo Code से Zoo Code में आने के लिए एक quick guide तुम्हें [Roo→Zoo migration guide](https://docs.zoocode.dev/roo-to-zoo-migration) में मिल जाएगी। We plan to help users as much as possible during the transition, और उसी support के लिए हमारा [Reddit](https://www.reddit.com/r/ZooCode) और [Discord](https://discord.gg/VxfP4Vx3gX) है। अगर तुम्हें कोई problem हो या कोई question हो, आकर पूछो।
 
-## v3.56.0 में नया क्या है
+## v3.72.0 में नया क्या है
 
-- Anthropic, Bedrock और Vertex providers पर **Claude Opus 4.8** का समर्थन
-- **Opencode Go** को नए first-class API provider के रूप में जोड़ा गया
-- **भरोसेमंद task cancellation** — किसी task को cancel करने पर अब चल रहा process सही तरीके से बंद होता है, जिद्दी processes के लिए automatic Ctrl+C retry भी
-- Gemini के custom model IDs को अनदेखा करके default पर fallback होने की समस्या ठीक की गई
-- Missing diff markers के कारण truncated Grok diffs ठीक किए गए
-- Windows पर कोई shell profile न होने पर PowerShell detection ठीक की गई
-- VS Code code actions में अभी भी Roo Code branding दिखने की समस्या ठीक की गई; सभी supported languages में localized
-- Google Cloud Credentials field में file path मिलने पर Vertex AI की गलत warning ठीक की गई
-- छह security dependency updates (diff, i18next-http-backend, fast-xml-parser, simple-git, uuid, turbo)
-
----
+- **Moonshot और Kimi Code providers** — Moonshot models को dynamically खोजें या OAuth device flow से Kimi Code में sign in करें।
+- **नवीनतम model support** — providers पर Claude Opus 5 के साथ Kimi K3, Gemini 3.6 Flash और MiniMax-M3 का उपयोग करें।
+- **बेहतर subtask workflows** — interrupted subtasks को साफ़ तौर पर छोड़ें, अधिक सुरक्षित task-history invalidation और बेहतर resume coverage के साथ।
+- **विस्तारित codebase indexing** — Dart और plain-text files को index करें।
+- **Provider reliability** — ChatGPT OAuth के साथ GPT-5.6 Luna, LiteLLM reasoning content और DeepSeek V4 image input के लिए fixes।
+- **अधिक सहज setup और settings** — Zoo Gateway sign-in और mode-switch behavior में सुधार।
+- API, provider types, dependencies, localization और CI में सुधार।
 
 ## Zoo Code आपके लिए क्या कर सकता है?
 

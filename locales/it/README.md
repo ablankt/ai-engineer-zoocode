@@ -16,13 +16,19 @@
 
         ## Siamo Zoo Code
 
-> Potresti aver visto il [recente annuncio](https://x.com/mattrubens/status/2046636598859559114) del team di Roo 🦘🦘🦘. In breve, il team sta riducendo progressivamente lo sviluppo attivo di Roo Code mentre si concentra su [Roomote](https://roomote.dev/). Questa notizia è stata difficile per molti utenti di Roo; questo plugin significa tantissimo per questa comunità.
+> Zoo Code continua lo sviluppo di questo progetto dopo che il team di Roo
+> ha interrotto lo sviluppo attivo di Roo Code per concentrarsi su
+> [Roomote](https://roomote.dev/). Grazie al team di Roo per tutto quello
+> che hanno costruito.
 >
-> Vogliamo ringraziare tutto il team di Roo per il lavoro che ha dedicato a questo plugin. Non faremo il nome di ogni singola persona qui, ma possiamo tutti concordare sul fatto che siano sviluppatori eccezionali e, cosa altrettanto importante, persone incredibili. Grazie al team di Roo.
->
-> Gli utenti di Roo arrivano da ogni tipo di contesto. Alcuni lo usano professionalmente ogni giorno, altri lo usano per ideare workflow incredibilmente complessi. Alcuni lo usano per migliorare Roo stesso, mentre altri lo usano per migliorare i modelli che Roo utilizza (super meta). Il punto è che la community è eterogenea e, anche se un canguro 🦘🦘🦘 è un animale distinto e nobile, ci è sembrato che uno "Zoo" 🐘🦡🦒🦓🦛🦧🦭🦦 rappresentasse meglio questa diversità di utenti del plugin.
->
-> Per questo vogliamo annunciare che **Zoo Code** continuerà lo sviluppo di questo importante progetto. Il team principale è composto da sviluppatori che avevano già contribuito a Roo e che tengono profondamente a questo plugin. Continueremo ad aggiornare i modelli, correggere bug e pubblicare funzionalità. Ma soprattutto, vogliamo ascoltare voi, la community che ha reso questo plugin così speciale. Quindi sentiti libero di unirti al nostro [Discord](https://discord.gg/VxfP4Vx3gX), al nostro [Reddit](https://www.reddit.com/r/ZooCode), o di [aprire una PR o una issue](https://github.com/Zoo-Code-Org/Zoo-Code); ma più di ogni altra cosa, ti chiediamo di restare coinvolto, connesso e attivo come community.
+> Il team principale è un gruppo di sviluppatori che avevano già contribuito
+> a Roo e che tengono profondamente a questo plugin. Continueremo ad
+> aggiornare i modelli, correggere bug e pubblicare funzionalità, e
+> intendiamo ascoltare con attenzione la community che ha reso questo
+> plugin così speciale. Unisciti a noi su
+> [Discord](https://discord.gg/VxfP4Vx3gX),
+> [Reddit](https://www.reddit.com/r/ZooCode), oppure
+> [apri una PR o una issue](https://github.com/Zoo-Code-Org/Zoo-Code).
 >
 > _-Zoo Code Team_
 
@@ -30,19 +36,15 @@
 
 Puoi trovare una guida rapida per passare da Roo Code a Zoo Code nella [guida alla migrazione Roo→Zoo](https://docs.zoocode.dev/roo-to-zoo-migration). Vogliamo aiutare gli utenti il più possibile durante la transizione, e per questo abbiamo il nostro [Reddit](https://www.reddit.com/r/ZooCode) e il nostro [Discord](https://discord.gg/VxfP4Vx3gX). Se hai problemi o domande, passa pure e chiedi.
 
-## Novità in v3.56.0
+## Novità in v3.72.0
 
-- Supporto per **Claude Opus 4.8** sui provider Anthropic, Bedrock e Vertex
-- **Opencode Go** aggiunto come nuovo provider API di primo livello
-- **Cancellazione delle task affidabile** — annullare una task ora termina correttamente il processo in esecuzione, con retry automatico di Ctrl+C per i processi ostinati
-- Corretti gli ID modello personalizzati di Gemini che venivano ignorati e tornavano al valore predefinito
-- Corretti i diff di Grok troncati per marcatori mancanti
-- Corretta la rilevazione di PowerShell su Windows senza profilo di shell configurato
-- Corrette le code action di VS Code che mostravano ancora il nome Roo Code; localizzate in tutte le lingue supportate
-- Corretta la notifica di Vertex AI quando il campo delle credenziali Google Cloud riceve un percorso file
-- Sei aggiornamenti di sicurezza delle dipendenze (diff, i18next-http-backend, fast-xml-parser, simple-git, uuid, turbo)
-
----
+- **Provider Moonshot e Kimi Code** — rileva dinamicamente i modelli Moonshot oppure accedi a Kimi Code tramite il flusso dispositivo OAuth.
+- **Supporto per i modelli più recenti** — usa Claude Opus 5 con tutti i provider, oltre a Kimi K3, Gemini 3.6 Flash e MiniMax-M3.
+- **Workflow delle sottoattività migliorati** — abbandona in modo pulito le sottoattività interrotte, con un'invalidazione più sicura della cronologia e una migliore copertura della ripresa.
+- **Indicizzazione della codebase ampliata** — indicizza i file Dart e di testo semplice.
+- **Affidabilità dei provider** — correzioni per GPT-5.6 Luna con ChatGPT OAuth, il reasoning content di LiteLLM e l'input di immagini di DeepSeek V4.
+- **Configurazione e impostazioni più fluide** — accesso a Zoo Gateway e cambio modalità migliorati.
+- Miglioramenti ad API, tipi di provider, dipendenze, localizzazione e CI.
 
 ## Cosa può fare Zoo Code per TE?
 

@@ -17,7 +17,9 @@
 		"condenseContext": "संदर्भ को बुद्धिमानी से संघनित करें",
 		"openApiHistory": "API इतिहास खोलें",
 		"openUiHistory": "UI इतिहास खोलें",
-		"backToParentTask": "मूल कार्य"
+		"backToParentTask": "मूल कार्य",
+		"waitingOnSubtask": "उपकार्य की प्रतीक्षा",
+		"goToSubtask": "उपकार्य पर जाएं"
 	},
 	"unpin": "पिन करें",
 	"pin": "अवपिन करें",
@@ -39,6 +41,14 @@
 	"startNewTask": {
 		"title": "नया कार्य शुरू करें",
 		"tooltip": "नया कार्य शुरू करें"
+	},
+	"seeNewChanges": {
+		"title": "नए बदलाव देखें",
+		"tooltip": "अपने पिछले prompt के बाद किए गए बदलाव देखें"
+	},
+	"restoreChanges": {
+		"title": "बदलाव पुनर्स्थापित करें",
+		"tooltip": "फ़ाइलें और कार्य स्थिति अपने पिछले prompt पर पुनर्स्थापित करें"
 	},
 	"proceedAnyways": {
 		"title": "फिर भी आगे बढ़ें",
@@ -177,7 +187,7 @@
 		"current": "वर्तमान"
 	},
 	"instructions": {
-		"wantsToFetch": "Roo को वर्तमान कार्य में सहायता के लिए विस्तृत निर्देश प्राप्त करना है"
+		"wantsToFetch": "Zoo को वर्तमान कार्य में सहायता के लिए विस्तृत निर्देश प्राप्त करना है"
 	},
 	"fileOperations": {
 		"wantsToRead": "Zoo इस फ़ाइल को पढ़ना चाहता है",
@@ -187,12 +197,12 @@
 		"wantsToEditOutsideWorkspace": "Zoo कार्यक्षेत्र के बाहर इस फ़ाइल को संपादित करना चाहता है",
 		"wantsToEditProtected": "Zoo एक सुरक्षित कॉन्फ़िगरेशन फ़ाइल को संपादित करना चाहता है",
 		"wantsToCreate": "Zoo एक नई फ़ाइल बनाना चाहता है",
-		"wantsToSearchReplace": "Roo इस फ़ाइल में खोज और प्रतिस्थापन करना चाहता है",
-		"didSearchReplace": "Roo ने इस फ़ाइल में खोज और प्रतिस्थापन किया",
+		"wantsToSearchReplace": "Zoo इस फ़ाइल में खोज और प्रतिस्थापन करना चाहता है",
+		"didSearchReplace": "Zoo ने इस फ़ाइल में खोज और प्रतिस्थापन किया",
 		"wantsToInsert": "Zoo इस फ़ाइल में सामग्री डालना चाहता है",
 		"wantsToInsertWithLineNumber": "Zoo इस फ़ाइल की {{lineNumber}} लाइन पर सामग्री डालना चाहता है",
 		"wantsToInsertAtEnd": "Zoo इस फ़ाइल के अंत में सामग्री जोड़ना चाहता है",
-		"wantsToReadAndXMore": "रू इस फ़ाइल को और {{count}} अन्य को पढ़ना चाहता है",
+		"wantsToReadAndXMore": "Zoo इस फ़ाइल को और {{count}} अन्य को पढ़ना चाहता है",
 		"wantsToReadMultiple": "Zoo कई फ़ाइलें पढ़ना चाहता है",
 		"wantsToApplyBatchChanges": "Zoo कई फ़ाइलों में परिवर्तन लागू करना चाहता है",
 		"wantsToGenerateImage": "Zoo एक छवि बनाना चाहता है",
@@ -221,6 +231,7 @@
 		"running": "चल रहा है",
 		"pid": "पीआईडी: {{pid}}",
 		"exitStatus": "{{exitCode}} स्थिति के साथ बाहर निकल गया",
+		"malformedCommand": "गलत कमांड: shell सिंटैक्स त्रुटि",
 		"manageCommands": "स्वतः-अनुमोदित कमांड",
 		"addToAllowed": "अनुमत सूची में जोड़ें",
 		"removeFromAllowed": "अनुमत सूची से हटाएँ",
@@ -235,7 +246,7 @@
 	"response": "प्रतिक्रिया",
 	"arguments": "आर्ग्युमेंट्स",
 	"text": {
-		"rooSaid": "रू ने कहा"
+		"rooSaid": "Zoo ने कहा"
 	},
 	"feedback": {
 		"youSaid": "आपने कहा"
@@ -330,16 +341,11 @@
 	"announcement": {
 		"title": "Zoo Code {{version}} रिलीज़ हो गया",
 		"support": "कृपया <githubLink>GitHub</githubLink> पर हमें स्टार देकर Zoo Code का समर्थन करें।",
-		"handoff": {
-			"heading": "Roo Code वापस आ गया है! अब Zoo Code नाम के community-maintained plugin के रूप में!!",
-			"description": "अगर आपने हाल की खबर नहीं देखी, तो Roo Code टीम ने हाल ही में घोषणा की कि वे Roo Code का विकास बंद कर रहे हैं और अब तक किए गए काम को archive कर रहे हैं। लेकिन चिंता मत करें, community नए नाम और नए घर के साथ Roo Code की विरासत को आगे बढ़ाने के लिए आगे आई है! अब हम सिर्फ एक \"Roo\" नहीं हैं, हम एक community हैं — अगर चाहो तो एक \"Zoo\"। Zoo Code एक community-maintained plugin है जो वहीं से आगे बढ़ता है जहाँ Roo Code रुका था, और हम Roo की भावना को ज़िंदा रखते हुए नई सुविधाएँ और सुधार लाने के लिए प्रतिबद्ध हैं। हम पूरी Roo Code टीम को उनके शानदार काम और डेवलपर्स के लिए इतना बेहतरीन tool बनाने के लिए दिल से धन्यवाद देना चाहते हैं। हम उनकी बनाई नींव पर आगे निर्माण करने और यह देखने के लिए उत्साहित हैं कि community Zoo Code को आगे कहाँ ले जाती है!",
-			"readMore": "Zoo Code का नया होम पेज देखें और पूरी घोषणा पढ़ें"
-		},
 		"release": {
 			"heading": "नया क्या है:",
-			"highlight1": "Claude Opus 4.8 और Opencode Go: Anthropic, Bedrock और Vertex पर Claude Opus 4.8 जोड़ा गया, साथ ही Opencode Go को नए first-class provider के रूप में शामिल किया गया।",
-			"highlight2": "भरोसेमंद task cancellation: किसी task को cancel करने पर अब चल रहा process सही तरीके से बंद हो जाता है, और जिद्दी processes के लिए automatic Ctrl+C retry भी होता है।",
-			"highlight3": "Provider और editor fixes: Gemini के custom model IDs, Grok diff truncation, Windows पर PowerShell detection, और VS Code code action branding को ठीक किया गया।"
+			"highlight1": "Moonshot और Kimi Code providers — live model discovery के साथ Moonshot models से कनेक्ट करें या OAuth device flow से Kimi Code में sign in करें।",
+			"highlight2": "नवीनतम model support — providers पर Claude Opus 5 के साथ Kimi K3, Gemini 3.6 Flash और MiniMax-M3 का उपयोग करें।",
+			"highlight3": "अधिक भरोसेमंद workflows — interrupted subtasks को साफ़ तौर पर छोड़ें और अपनी codebase में Dart व plain-text files को index करें।"
 		},
 		"cloudAgents": {
 			"heading": "क्लाउड में नया:",

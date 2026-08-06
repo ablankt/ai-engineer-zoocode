@@ -1,6 +1,6 @@
 import { distance } from "fastest-levenshtein"
 
-import { ToolProgressStatus } from "@roo-code/types"
+import { ToolProgressStatus, DEFAULT_DIFF_FUZZY_THRESHOLD } from "@roo-code/types"
 
 import { addLineNumbers, everyLineHasLineNumbers, stripLineNumbers } from "../../../integrations/misc/extract-text"
 import { ToolUse, DiffStrategy, DiffResult } from "../../../shared/tools"
@@ -82,9 +82,12 @@ export class MultiSearchReplaceDiffStrategy implements DiffStrategy {
 
 	constructor(fuzzyThreshold?: number, bufferLines?: number) {
 		// Use provided threshold or default to exact matching (1.0)
-		// Note: fuzzyThreshold is inverted in UI (0% = 1.0, 10% = 0.9)
-		// so we use it directly here
-		this.fuzzyThreshold = fuzzyThreshold ?? 1.0
+		// A value of 0.9 means 90% similarity is required for a match,
+		// but the default remains 1.0 (exact match). Users can opt in
+		// to relaxed matching via diffFuzzyThreshold in settings.
+		// Clamp the threshold to [0.5, 1.0] as a defence-in-depth guard.
+		const thresholdVal = fuzzyThreshold ?? DEFAULT_DIFF_FUZZY_THRESHOLD
+		this.fuzzyThreshold = Math.max(0.5, Math.min(1.0, thresholdVal))
 		this.bufferLines = bufferLines ?? BUFFER_LINES
 	}
 
@@ -391,7 +394,7 @@ export class MultiSearchReplaceDiffStrategy implements DiffStrategy {
 			  Matches the final ">>>>>>> REPLACE" marker on its own line (and requires a following newline or the end of file).
 		*/
 
-		let matches = [
+		const matches = [
 			...repairedDiff.matchAll(
 				/(?:^|\n)(?<!\\)<<<<<<< SEARCH>?\s*\n((?:\:start_line:\s*(\d+)\s*\n))?((?:\:end_line:\s*(\d+)\s*\n))?((?<!\\)-------\s*\n)?([\s\S]*?)(?:\n)?(?:(?<=\n)(?<!\\)=======\s*\n)([\s\S]*?)(?:\n)?(?:(?<=\n)(?<!\\)>>>>>>> REPLACE)(?=\n|$)/g,
 			),
@@ -407,7 +410,7 @@ export class MultiSearchReplaceDiffStrategy implements DiffStrategy {
 		const lineEnding = originalContent.includes("\r\n") ? "\r\n" : "\n"
 		let resultLines = originalContent.split(/\r?\n/)
 		let delta = 0
-		let diffResults: DiffResult[] = []
+		const diffResults: DiffResult[] = []
 		let appliedCount = 0
 		const replacements = matches
 			.map((match) => ({
@@ -465,13 +468,13 @@ export class MultiSearchReplaceDiffStrategy implements DiffStrategy {
 				continue
 			}
 
-			let endLine = replacement.startLine + searchLines.length - 1
+			const endLine = replacement.startLine + searchLines.length - 1
 
 			// Initialize search variables
 			let matchIndex = -1
 			let bestMatchScore = 0
 			let bestMatchContent = ""
-			let searchChunk = searchLines.join("\n")
+			const searchChunk = searchLines.join("\n")
 
 			// Determine search bounds
 			let searchStartIndex = 0
@@ -537,7 +540,7 @@ export class MultiSearchReplaceDiffStrategy implements DiffStrategy {
 				} else {
 					// No match found with either method
 					const originalContentSection =
-						startLine !== undefined && endLine !== undefined
+						startLine && endLine
 							? `\n\nOriginal Content:\n${addLineNumbers(
 									resultLines
 										.slice(
@@ -547,7 +550,20 @@ export class MultiSearchReplaceDiffStrategy implements DiffStrategy {
 										.join("\n"),
 									Math.max(1, startLine - this.bufferLines),
 								)}`
-							: `\n\nOriginal Content:\n${addLineNumbers(resultLines.join("\n"))}`
+							: `\n\nOriginal Content:\n${addLineNumbers(
+									resultLines
+										.slice(
+											Math.max(0, (matchIndex >= 0 ? matchIndex : 0) - this.bufferLines),
+											Math.min(
+												resultLines.length,
+												(matchIndex >= 0 ? matchIndex : 0) +
+													searchLines.length +
+													this.bufferLines,
+											),
+										)
+										.join("\n"),
+									Math.max(1, (matchIndex >= 0 ? matchIndex : 0) - this.bufferLines + 1),
+								)}`
 
 					const bestMatchSection = bestMatchContent
 						? `\n\nBest Match Found:\n${addLineNumbers(bestMatchContent, matchIndex + 1)}`
@@ -555,9 +571,13 @@ export class MultiSearchReplaceDiffStrategy implements DiffStrategy {
 
 					const lineRange = startLine ? ` at line: ${startLine}` : ""
 
+					const levenDist = bestMatchContent
+						? distance(normalizeString(searchChunk), normalizeString(bestMatchContent))
+						: -1
+
 					diffResults.push({
 						success: false,
-						error: `No sufficiently similar match found${lineRange} (${Math.floor(bestMatchScore * 100)}% similar, needs ${Math.floor(this.fuzzyThreshold * 100)}%)\n\nDebug Info:\n- Similarity Score: ${Math.floor(bestMatchScore * 100)}%\n- Required Threshold: ${Math.floor(this.fuzzyThreshold * 100)}%\n- Search Range: ${startLine ? `starting at line ${startLine}` : "start to end"}\n- Tried both standard and aggressive line number stripping\n- Tip: Use the read_file tool to get the latest content of the file before attempting to use the apply_diff tool again, as the file content may have changed\n\nSearch Content:\n${searchChunk}${bestMatchSection}${originalContentSection}`,
+						error: `No sufficiently similar match found${lineRange} (${Math.floor(bestMatchScore * 100)}% similar, needs ${Math.floor(this.fuzzyThreshold * 100)}%)\n\nDebug Info:\n- Similarity Score: ${Math.floor(bestMatchScore * 100)}%\n- Required Threshold: ${Math.floor(this.fuzzyThreshold * 100)}%\n- Search Range: ${startLine ? `starting at line ${startLine}` : "start to end"}\n- Levenshtein Distance: ${levenDist >= 0 ? `${levenDist} characters` : "N/A"}\n- Search Length: ${searchChunk.length} characters\n- Best Match Length: ${bestMatchContent ? bestMatchContent.length : 0} characters\n- Tried both standard and aggressive line number stripping\n- Tip: Use the read_file tool to get the latest content of the file before attempting to use the apply_diff tool again, as the file content may have changed\n\nSearch Content:\n${searchChunk}${bestMatchSection}${originalContentSection}`,
 					})
 					continue
 				}

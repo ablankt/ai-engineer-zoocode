@@ -41,7 +41,8 @@
 		"experimental": "Deneysel",
 		"language": "Dil",
 		"about": "Zoo Code Hakkında",
-		"skills": "Skills"
+		"skills": "Skills",
+		"rules": "Kurallar"
 	},
 	"about": {
 		"bugReport": {
@@ -62,6 +63,24 @@
 		"debugMode": {
 			"label": "Debug modunu etkinleştir",
 			"description": "Görev başlığında API konuşma geçmişini ve UI mesajlarını geçici dosyalarda biçimlendirilmiş JSON olarak görüntülemek için ek düğmeler göstermek üzere debug modunu etkinleştirin."
+		},
+		"rooHistoryImport": {
+			"settingLabel": "Roo Code'dan geçmişi içe aktar",
+			"cardTitle": "Roo Code geçmişi",
+			"cardDescription": "Kayıtlı Roo Code konuşmalarını Zoo Code'a kopyala.",
+			"statusImporting": "Geçmiş içe aktarılıyor",
+			"statusFailed": "İçe aktarma başarısız",
+			"statusComplete": "İçe aktarma tamamlandı",
+			"buttonImporting": "Roo Code'dan içe aktarılıyor...",
+			"buttonIdle": "Roo Code'dan geçmişi içe aktar",
+			"summaryFailedWithFiles": "İçe aktarma durduğunda {{total}} dosyanın {{copied}} tanesi kopyalandı.",
+			"summaryFailedNoFiles": "Herhangi bir dosya kopyalanmadan içe aktarma durdu.",
+			"summaryCopied": "{{total}} dosyadan {{copied}} tanesi kopyalandı",
+			"detailFailed": "Yeniden denemek için yeni bir içe aktarma başlat.",
+			"detailTasksImported_one": "{{total}} görev geçmişinden {{count}} tanesi içe aktarıldı.",
+			"detailTasksImported_other": "{{total}} görev geçmişinden {{count}} tanesi içe aktarıldı.",
+			"detailPreparing": "Roo Code geçmişi içe aktarma hazırlanıyor.",
+			"progressAriaLabel": "Roo Code geçmişi içe aktarma ilerlemesi"
 		}
 	},
 	"slashCommands": {
@@ -98,6 +117,52 @@
 			"nameInvalid": "Ad yalnızca harfleri, sayıları, tirelemeyi ve alt çizgiyi içerebilir"
 		},
 		"footer": "Sık kullanılan komutlara ve iş akışlarına hızlı erişim için eğik çizgi komutlarını kullanın."
+	},
+	"rules": {
+		"description": "Genel ve workspace .roo/rules dizinlerinden Zoo Code kural dosyalarını yönet. Yapılandırma klasörlerinde manuel gezinmeden genel kurallar veya moda özel kurallar oluştur.",
+		"workspaceRules": "Workspace Kuralları",
+		"globalRules": "Genel Kurallar",
+		"noWorkspaceRules": "Bu projede henüz kural yok.",
+		"noGlobalRules": "Henüz genel kural yok.",
+		"addRule": "Kural Ekle",
+		"editRule": "Kuralı düzenle",
+		"deleteRule": "Kuralı sil",
+		"modeLabel": "Mod: {{mode}}",
+		"deleteDialog": {
+			"title": "Kuralı Sil",
+			"description": "\"{{name}}\" kuralını silmek istediğinden emin misin? Bu işlem geri alınamaz.",
+			"confirm": "Sil",
+			"cancel": "İptal"
+		},
+		"createDialog": {
+			"title": "Yeni Kural Oluştur",
+			"nameLabel": "Ad",
+			"namePlaceholder": "kural-adim",
+			"nameHint": "Yalnızca küçük harfler, sayılar, kısa çizgiler ve alt çizgiler. .md otomatik eklenir.",
+			"scopeLabel": "Konum",
+			"kindLabel": "Kural türü",
+			"modeLabel": "Mod",
+			"modePlaceholder": "Bir mod seç",
+			"create": "Oluştur",
+			"cancel": "İptal"
+		},
+		"scope": {
+			"global": "Genel (tüm workspace’lerde kullanılabilir)",
+			"project": "Workspace"
+		},
+		"kind": {
+			"generic": "Genel kurallar",
+			"mode": "Moda özel kurallar",
+			"genericBadge": "Genel",
+			"modeBadge": "Mod"
+		},
+		"validation": {
+			"nameRequired": "Ad zorunludur",
+			"nameTooLong": "Ad 64 karakter veya daha kısa olmalıdır",
+			"nameInvalid": "Ad yalnızca küçük harfler, sayılar, kısa çizgiler ve alt çizgiler içerebilir",
+			"modeRequired": "Moda özel kurallar için mod zorunludur"
+		},
+		"footer": "Kurallar, genel rehberlikten önce moda özel rehberliği yükler. Genel kurallar workspace kurallarından önce yüklenir."
 	},
 	"prompts": {
 		"description": "Prompt geliştirme, kod açıklama ve sorun çözme gibi hızlı eylemler için kullanılan destek promptlarını yapılandırın. Bu promptlar, Zoo'nun yaygın geliştirme görevleri için daha iyi destek sağlamasına yardımcı olur."
@@ -213,11 +278,12 @@
 		"stoppingButton": "Durduruluyor...",
 		"workspaceToggleLabel": "Bu çalışma alanı için indekslemeyi etkinleştir",
 		"workspaceDisabledMessage": "İndeksleme yapılandırıldı ancak bu çalışma alanı için etkinleştirilmedi.",
-		"autoEnableDefaultLabel": "Yeni çalışma alanları için indekslemeyi otomatik etkinleştir"
+		"autoEnableDefaultLabel": "Yeni çalışma alanları için indekslemeyi otomatik etkinleştir",
+		"sembleProvider": "Semble - Yerel"
 	},
 	"autoApprove": {
 		"toggleShortcut": "<SettingsLink>IDE tercihlerinizde</SettingsLink> bu ayar için genel bir kısayol yapılandırabilirsiniz.",
-		"description": "Roo'nun onay gerektirmeden otomatik olarak işlemler gerçekleştirmesine izin verin. Bu ayarları yalnızca yapay zekaya tamamen güveniyorsanız ve ilgili güvenlik risklerini anlıyorsanız etkinleştirin.",
+		"description": "Zoo'nun onay gerektirmeden otomatik olarak işlemler gerçekleştirmesine izin verin. Bu ayarları yalnızca yapay zekaya tamamen güveniyorsanız ve ilgili güvenlik risklerini anlıyorsanız etkinleştirin.",
 		"enabled": "Oto-onay etkinleştirildi",
 		"toggleAriaLabel": "Otomatik onayı değiştir",
 		"disabledAriaLabel": "Otomatik onay devre dışı - önce seçenekleri belirleyin",
@@ -316,6 +382,8 @@
 		"getVercelAiGatewayApiKey": "Vercel AI Gateway API Anahtarı Al",
 		"opencodeGoApiKey": "Opencode Go API Anahtarı",
 		"getOpencodeGoApiKey": "Opencode Go API Anahtarı Al",
+		"kenariApiKey": "Kenari API Anahtarı",
+		"getKenariApiKey": "Kenari API Anahtarı Al",
 		"apiKeyStorageNotice": "API anahtarları VSCode'un Gizli Depolamasında güvenli bir şekilde saklanır",
 		"openAiCodexRateLimits": {
 			"title": "Usage Limits for Codex{{planLabel}}",
@@ -384,11 +452,24 @@
 		"poeBaseUrl": "Poe Temel URL",
 		"fireworksApiKey": "Fireworks API Anahtarı",
 		"getFireworksApiKey": "Fireworks API Anahtarı Al",
+		"friendliApiKey": "Friendli API Anahtarı",
+		"getFriendliApiKey": "Friendli API Anahtarı Al",
 		"deepSeekApiKey": "DeepSeek API Anahtarı",
 		"getDeepSeekApiKey": "DeepSeek API Anahtarı Al",
 		"moonshotApiKey": "Moonshot API Anahtarı",
 		"getMoonshotApiKey": "Moonshot API Anahtarı Al",
 		"moonshotBaseUrl": "Moonshot Giriş Noktası",
+		"kimiCode": {
+			"authMethod": "Authentication method",
+			"oauth": "Kimi Code subscription (OAuth)",
+			"apiKey": "Kimi Code API key",
+			"apiKeyLabel": "Kimi Code API Key",
+			"signIn": "Sign in to Kimi Code",
+			"signOut": "Sign out",
+			"authenticated": "Signed in to Kimi Code",
+			"deviceCodeHelp": "Enter this device code in the Kimi authorization page:",
+			"docs": "Kimi Code documentation"
+		},
 		"zaiApiKey": "Z AI API Anahtarı",
 		"getZaiApiKey": "Z AI API Anahtarı Al",
 		"zaiEntrypoint": "Z AI Giriş Noktası",
@@ -475,6 +556,8 @@
 			"apiKeyHelp": "Kimlik doğrulamalı Ollama örnekleri veya bulut hizmetleri için isteğe bağlı API anahtarı. Yerel kurulumlar için boş bırakın.",
 			"numCtx": "Bağlam Penceresi Boyutu (num_ctx)",
 			"numCtxHelp": "Modelin varsayılan bağlam penceresi boyutunu geçersiz kılar. Modelin Modelfile yapılandırmasını kullanmak için boş bırakın. Minimum değer 128'dir.",
+			"thinking": "Akıl yürütmeyi etkinleştir",
+			"thinkingHelp": "Akıl yürütme modelleri (örn. qwen3, deepseek-r1) için Ollama'nın yerel akıl yürütmesini etkinleştirir. Etkinleştirildiğinde, modelin akıl yürütmesi ayrı olarak akışla aktarılır ve görüntülenir. Desteklenmeyen modeller bu ayarı yok sayar.",
 			"description": "Ollama, modelleri bilgisayarınızda yerel olarak çalıştırmanıza olanak tanır. Başlamak için hızlı başlangıç kılavuzlarına bakın.",
 			"warning": "Not: Zoo Code karmaşık istemler kullanır ve Claude modelleriyle en iyi şekilde çalışır. Daha az yetenekli modeller beklendiği gibi çalışmayabilir."
 		},
@@ -543,6 +626,7 @@
 			"minimal": "Minimal (en hızlı)",
 			"high": "Yüksek",
 			"xhigh": "Çok yüksek",
+			"max": "Maksimum",
 			"medium": "Orta",
 			"low": "Düşük"
 		},
@@ -651,6 +735,12 @@
 				"description": "Devam etmeden önce dosya yazımlarından sonra beklenecek süre, tanılama araçlarının değişiklikleri işlemesine ve sorunları tespit etmesine olanak tanır."
 			}
 		},
+		"fileEdits": {
+			"diffFuzzyThreshold": {
+				"label": "Diff eşleşme eşiği",
+				"description": "Düşük eşikler, dosya düzenlemelerini biçimlendirme ve boşluk farklılıklarına karşı daha dayanıklı hale getirir. %100 eşik, tam eşleşme gerektirir."
+			}
+		},
 		"condensingThreshold": {
 			"label": "Sıkıştırma Tetikleme Eşiği",
 			"selectProfile": "Profil için eşik yapılandır",
@@ -750,10 +840,9 @@
 			"description": "Ana VS Code işleminden ortam değişkenlerini devralmak için bunu açın. <0>Daha fazla bilgi edinin</0>"
 		},
 		"profile": {
-			"label": "Zoo Code terminal geçersiz kılma",
-			"default": "VS Code varsayılan profilini kullan (önerilir)",
-			"description": "Varsayılan olarak Zoo Code, VS Code'da yapılandırılmış kabuğu kullanır. VS Code'un sunduğu yol tabanlı bir kabuk profili seçmek için Geçersiz Kıl'ı seçin. Yalnızca kaynak profiller (örn. yerleşik PowerShell girişi) burada listelenemez. <0>Daha fazla bilgi</0>",
-			"overrideLabel": "Zoo Code için kabuk geçersiz kıl",
+			"label": "Zoo Code terminal profili",
+			"followVscode": "VS Code profili takip ediliyor (önerilir)",
+			"description": "Varsayılan olarak Zoo Code, VS Code'da yapılandırılmış kabuğu kullanır. VS Code'un sunduğu yol tabanlı bir kabuk profili seçmek için listeden bir kabuk profili seçin. Yalnızca kaynak profiller (örn. yerleşik PowerShell girişi) burada listelenemez. <0>Daha fazla bilgi</0>",
 			"configureButton": "VS Code'da varsayılan profili seç",
 			"noProfiles": "(terminal.integrated.profiles'da yol tabanlı profil bulunamadı)"
 		}
@@ -984,6 +1073,18 @@
 			"label": "Sohbet yazı tipi boyutu",
 			"description": "Zoo Code sohbeti için yazı tipi boyutunu (piksel cinsinden) ayarlayın. VS Code yazı tipi boyutuyla eşleşmesi için varsayılan değerde bırakın.",
 			"reset": "VS Code varsayılanını kullan"
+		},
+		"autoCloseZooOpenedFiles": {
+			"label": "Zoo tarafindan acilan dosyalari otomatik kapat",
+			"description": "Etkinlestirildiginde, Zoo'nun bir diff icin gecici olarak actigi duzenleyici sekmeleri, degisiklik kabul edildikten veya reddedildikten sonra otomatik olarak kapatilir. Kullanicinin duzenleme oncesinde zaten acik oldugu sekmeler hicbir zaman otomatik olarak kapatilmaz."
+		},
+		"autoCloseZooOpenedFilesAfterUserEdited": {
+			"label": "Kullanici etkilesiminden sonra da otomatik kapat",
+			"description": "Etkinlestirildiginde, kullanici duzenleme oturumu sirasinda dosyaya veya diff'e tiklasa ya da yazsa bile Zoo tarafindan acilan sekmeler kapatilir. 'Zoo tarafindan acilan dosyalari otomatik kapat' devre disi ise etkisi yoktur."
+		},
+		"autoCloseZooOpenedNewFiles": {
+			"label": "Yeni olusturulan dosyalari otomatik kapat",
+			"description": "Etkinlestirildiginde, Zoo'nun olusturdugu (degistirmedigi) dosyalarin sekmeleri de degisiklik kabul edildikten sonra otomatik olarak kapatilir."
 		}
 	},
 	"skills": {

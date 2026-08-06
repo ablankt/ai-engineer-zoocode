@@ -1,6 +1,7 @@
 // pnpm --filter roo-cline test core/webview/__tests__/ClineProvider.spec.ts
 
 import * as path from "path"
+import { TaskRegistry } from "../../task/TaskRegistry"
 
 import Anthropic from "@anthropic-ai/sdk"
 import * as vscode from "vscode"
@@ -11,8 +12,12 @@ import {
 	type ClineMessage,
 	type ExtensionMessage,
 	type ExtensionState,
+	type WebviewMessage,
 	ORGANIZATION_ALLOW_ALL,
 	DEFAULT_CHECKPOINT_TIMEOUT_SECONDS,
+	DEFAULT_DIFF_FUZZY_THRESHOLD,
+	DEFAULT_WRITE_DELAY_MS,
+	providerIdentifiers,
 } from "@roo-code/types"
 import { TelemetryService } from "@roo-code/telemetry"
 
@@ -24,8 +29,10 @@ import { Task, TaskOptions } from "../../task/Task"
 import { safeWriteJson } from "../../../utils/safeWriteJson"
 
 import { ClineProvider } from "../ClineProvider"
+import { webviewMessageHandler } from "../webviewMessageHandler"
 import { Terminal } from "../../../integrations/terminal/Terminal"
 import { MessageManager } from "../../message-manager"
+import { forceFullModelDetailsLoad, hasLoadedFullDetails } from "../../../api/providers/fetchers/lmstudio"
 
 // Mock setup must come before imports.
 vi.mock("../../prompts/sections/custom-instructions")
@@ -35,13 +42,25 @@ vi.mock("p-wait-for", () => ({
 	default: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock("fs/promises", () => ({
-	mkdir: vi.fn().mockResolvedValue(undefined),
-	writeFile: vi.fn().mockResolvedValue(undefined),
-	readFile: vi.fn().mockResolvedValue(""),
-	unlink: vi.fn().mockResolvedValue(undefined),
-	rmdir: vi.fn().mockResolvedValue(undefined),
-}))
+vi.mock("fs/promises", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("fs/promises")>()
+	const mocked = {
+		mkdir: vi.fn().mockResolvedValue(undefined),
+		writeFile: vi.fn().mockResolvedValue(undefined),
+		readFile: vi.fn().mockResolvedValue(""),
+		unlink: vi.fn().mockResolvedValue(undefined),
+		rmdir: vi.fn().mockResolvedValue(undefined),
+	}
+
+	return {
+		...actual,
+		...mocked,
+		default: {
+			...actual,
+			...mocked,
+		},
+	}
+})
 
 vi.mock("axios", () => ({
 	default: {
@@ -107,30 +126,36 @@ vi.mock("delay", () => {
 // MCP-related modules are mocked once above (lines 87-109).
 
 vi.mock("@modelcontextprotocol/sdk/client/index.js", () => ({
-	Client: vi.fn().mockImplementation(() => ({
-		connect: vi.fn().mockResolvedValue(undefined),
-		close: vi.fn().mockResolvedValue(undefined),
-		listTools: vi.fn().mockResolvedValue({ tools: [] }),
-		callTool: vi.fn().mockResolvedValue({ content: [] }),
-	})),
+	Client: vi.fn().mockImplementation(function () {
+		return {
+			connect: vi.fn().mockResolvedValue(undefined),
+			close: vi.fn().mockResolvedValue(undefined),
+			listTools: vi.fn().mockResolvedValue({ tools: [] }),
+			callTool: vi.fn().mockResolvedValue({ content: [] }),
+		}
+	}),
 }))
 
 vi.mock("@modelcontextprotocol/sdk/client/stdio.js", () => ({
-	StdioClientTransport: vi.fn().mockImplementation(() => ({
-		connect: vi.fn().mockResolvedValue(undefined),
-		close: vi.fn().mockResolvedValue(undefined),
-	})),
+	StdioClientTransport: vi.fn().mockImplementation(function () {
+		return {
+			connect: vi.fn().mockResolvedValue(undefined),
+			close: vi.fn().mockResolvedValue(undefined),
+		}
+	}),
 }))
 
 vi.mock("vscode", () => ({
 	ExtensionContext: vi.fn(),
 	OutputChannel: vi.fn(),
 	WebviewView: vi.fn(),
-	EventEmitter: vi.fn().mockImplementation(() => ({
-		event: vi.fn(),
-		fire: vi.fn(),
-		dispose: vi.fn(),
-	})),
+	EventEmitter: vi.fn().mockImplementation(function () {
+		return {
+			event: vi.fn(),
+			fire: vi.fn(),
+			dispose: vi.fn(),
+		}
+	}),
 	Uri: {
 		joinPath: vi.fn(),
 		file: vi.fn(),
@@ -146,6 +171,8 @@ vi.mock("vscode", () => ({
 		showInformationMessage: vi.fn(),
 		showWarningMessage: vi.fn(),
 		showErrorMessage: vi.fn(),
+		showSaveDialog: vi.fn(),
+		showOpenDialog: vi.fn(),
 		activeTextEditor: undefined,
 		onDidChangeActiveTextEditor: vi.fn(() => ({ dispose: vi.fn() })),
 	},
@@ -155,9 +182,11 @@ vi.mock("vscode", () => ({
 			update: vi.fn(),
 		}),
 		getWorkspaceFolder: vi.fn(),
-		onDidChangeConfiguration: vi.fn().mockImplementation(() => ({
-			dispose: vi.fn(),
-		})),
+		onDidChangeConfiguration: vi.fn().mockImplementation(() => {
+			return {
+				dispose: vi.fn(),
+			}
+		}),
 		onDidSaveTextDocument: vi.fn(() => ({ dispose: vi.fn() })),
 		onDidChangeTextDocument: vi.fn(() => ({ dispose: vi.fn() })),
 		onDidOpenTextDocument: vi.fn(() => ({ dispose: vi.fn() })),
@@ -177,8 +206,39 @@ vi.mock("vscode", () => ({
 }))
 
 vi.mock("../../../utils/tts", () => ({
+	playTts: vi.fn().mockResolvedValue(undefined),
 	setTtsEnabled: vi.fn(),
 	setTtsSpeed: vi.fn(),
+	stopTts: vi.fn(),
+}))
+
+vi.mock("../../../integrations/misc/open-file", () => ({
+	openFile: vi.fn().mockResolvedValue(undefined),
+}))
+
+vi.mock("../../../integrations/misc/image-handler", () => ({
+	openImage: vi.fn().mockResolvedValue(undefined),
+	saveImage: vi.fn().mockResolvedValue(undefined),
+}))
+
+vi.mock("../../mentions", () => ({
+	openMention: vi.fn().mockResolvedValue(undefined),
+}))
+
+vi.mock("../../../utils/export", () => ({
+	resolveDefaultSaveUri: vi.fn().mockResolvedValue({ fsPath: "/test/default-export.yaml" }),
+	saveLastExportPath: vi.fn().mockResolvedValue(undefined),
+}))
+
+vi.mock("../../../integrations/openai-codex/oauth", () => ({
+	openAiCodexOAuthManager: {
+		getAccessToken: vi.fn(),
+		getAccountId: vi.fn(),
+	},
+}))
+
+vi.mock("../../../integrations/openai-codex/rate-limits", () => ({
+	fetchOpenAiCodexRateLimitInfo: vi.fn(),
 }))
 
 vi.mock("../../../api", () => ({
@@ -192,29 +252,33 @@ vi.mock("../../prompts/system", () => ({
 
 vi.mock("../../../integrations/workspace/WorkspaceTracker", () => {
 	return {
-		default: vi.fn().mockImplementation(() => ({
-			initializeFilePaths: vi.fn(),
-			dispose: vi.fn(),
-		})),
+		default: vi.fn().mockImplementation(function () {
+			return {
+				initializeFilePaths: vi.fn().mockResolvedValue(undefined),
+				dispose: vi.fn(),
+			}
+		}),
 	}
 })
 
 vi.mock("../../task/Task", () => ({
-	Task: vi.fn().mockImplementation((options: any) => ({
-		api: undefined,
-		abortTask: vi.fn(),
-		handleWebviewAskResponse: vi.fn(),
-		clineMessages: [],
-		apiConversationHistory: [],
-		overwriteClineMessages: vi.fn(),
-		overwriteApiConversationHistory: vi.fn(),
-		getTaskNumber: vi.fn().mockReturnValue(0),
-		setTaskNumber: vi.fn(),
-		setParentTask: vi.fn(),
-		setRootTask: vi.fn(),
-		taskId: options?.historyItem?.id || "test-task-id",
-		emit: vi.fn(),
-	})),
+	Task: vi.fn().mockImplementation(function (options: any) {
+		return {
+			api: undefined,
+			abortTask: vi.fn(),
+			handleWebviewAskResponse: vi.fn(),
+			clineMessages: [],
+			apiConversationHistory: [],
+			overwriteClineMessages: vi.fn(),
+			overwriteApiConversationHistory: vi.fn(),
+			getTaskNumber: vi.fn().mockReturnValue(0),
+			setTaskNumber: vi.fn(),
+			setParentTask: vi.fn(),
+			setRootTask: vi.fn(),
+			taskId: options?.historyItem?.id || "test-task-id",
+			emit: vi.fn(),
+		}
+	}),
 }))
 
 vi.mock("../../../integrations/misc/extract-text", () => ({
@@ -229,6 +293,11 @@ vi.mock("../../../api/providers/fetchers/modelCache", () => ({
 	getModels: vi.fn().mockResolvedValue({}),
 	flushModels: vi.fn(),
 	getModelsFromCache: vi.fn().mockReturnValue(undefined),
+}))
+
+vi.mock("../../../api/providers/fetchers/lmstudio", () => ({
+	hasLoadedFullDetails: vi.fn().mockReturnValue(false),
+	forceFullModelDetailsLoad: vi.fn().mockResolvedValue(undefined),
 }))
 
 vi.mock("../../../services/zoo-code-auth", () => ({
@@ -310,11 +379,13 @@ vi.mock("../../../api/providers/fetchers/modelCache", () => ({
 }))
 
 vi.mock("../diff/strategies/multi-search-replace", () => ({
-	MultiSearchReplaceDiffStrategy: vi.fn().mockImplementation(() => ({
-		getToolDescription: () => "test",
-		getName: () => "test-strategy",
-		applyDiff: vi.fn(),
-	})),
+	MultiSearchReplaceDiffStrategy: vi.fn().mockImplementation(function () {
+		return {
+			getToolDescription: () => "test",
+			getName: () => "test-strategy",
+			applyDiff: vi.fn(),
+		}
+	}),
 }))
 
 vi.mock("@roo-code/cloud", () => ({
@@ -323,6 +394,8 @@ vi.mock("@roo-code/cloud", () => ({
 		get instance() {
 			return {
 				isAuthenticated: vi.fn().mockReturnValue(false),
+				login: vi.fn().mockResolvedValue(undefined),
+				logout: vi.fn().mockResolvedValue(undefined),
 				off: vi.fn(),
 			}
 		},
@@ -336,7 +409,7 @@ afterAll(() => {
 
 describe("ClineProvider", () => {
 	beforeAll(() => {
-		vi.mocked(Task).mockImplementation((options: any) => {
+		vi.mocked(Task).mockImplementation(function (options: any) {
 			const task: any = {
 				api: undefined,
 				abortTask: vi.fn(),
@@ -366,7 +439,7 @@ describe("ClineProvider", () => {
 	let provider: ClineProvider
 	let mockContext: vscode.ExtensionContext
 	let mockOutputChannel: vscode.OutputChannel
-	let mockWebviewView: vscode.WebviewView
+	let mockWebviewView: any
 	let mockPostMessage: any
 	let updateGlobalStateSpy: any
 
@@ -388,16 +461,26 @@ describe("ClineProvider", () => {
 			extensionPath: "/test/path",
 			extensionUri: { fsPath: "/test/path" } as vscode.Uri,
 			globalState: {
-				get: vi.fn().mockImplementation((key: string) => globalState[key]),
-				update: vi
-					.fn()
-					.mockImplementation((key: string, value: string | undefined) => (globalState[key] = value)),
-				keys: vi.fn().mockImplementation(() => Object.keys(globalState)),
+				get: vi.fn().mockImplementation((key: string) => {
+					return globalState[key]
+				}),
+				update: vi.fn().mockImplementation((key: string, value: string | undefined) => {
+					return (globalState[key] = value)
+				}),
+				keys: vi.fn().mockImplementation(() => {
+					return Object.keys(globalState)
+				}),
 			},
 			secrets: {
-				get: vi.fn().mockImplementation((key: string) => secrets[key]),
-				store: vi.fn().mockImplementation((key: string, value: string | undefined) => (secrets[key] = value)),
-				delete: vi.fn().mockImplementation((key: string) => delete secrets[key]),
+				get: vi.fn().mockImplementation((key: string) => {
+					return secrets[key]
+				}),
+				store: vi.fn().mockImplementation((key: string, value: string | undefined) => {
+					return (secrets[key] = value)
+				}),
+				delete: vi.fn().mockImplementation((key: string) => {
+					return delete secrets[key]
+				}),
 			},
 			workspaceState: {
 				get: vi.fn().mockReturnValue(undefined),
@@ -444,8 +527,10 @@ describe("ClineProvider", () => {
 				callback()
 				return { dispose: vi.fn() }
 			}),
-			onDidChangeVisibility: vi.fn().mockImplementation(() => ({ dispose: vi.fn() })),
-		} as unknown as vscode.WebviewView
+			onDidChangeVisibility: vi.fn().mockImplementation(() => {
+				return { dispose: vi.fn() }
+			}),
+		}
 
 		provider = new ClineProvider(mockContext, mockOutputChannel, "sidebar", new ContextProxy(mockContext))
 
@@ -480,6 +565,32 @@ describe("ClineProvider", () => {
 		expect(ClineProvider.getVisibleInstance()).toBe(provider)
 	})
 
+	test("loads full model details when preparing an LM Studio task", async () => {
+		await provider.performPreparationTasks({
+			apiConfiguration: {
+				apiProvider: providerIdentifiers.lmstudio,
+				lmStudioBaseUrl: "http://localhost:1234",
+				lmStudioModelId: "test-model",
+			},
+		} as Task)
+
+		expect(forceFullModelDetailsLoad).toHaveBeenCalledWith("http://localhost:1234", "test-model")
+	})
+
+	test("does not reload full model details when the LM Studio model is already loaded", async () => {
+		vi.mocked(hasLoadedFullDetails).mockReturnValue(true)
+
+		await provider.performPreparationTasks({
+			apiConfiguration: {
+				apiProvider: providerIdentifiers.lmstudio,
+				lmStudioBaseUrl: "http://localhost:1234",
+				lmStudioModelId: "test-model",
+			},
+		} as Task)
+
+		expect(forceFullModelDetailsLoad).not.toHaveBeenCalled()
+	})
+
 	test("resolveWebviewView hydrates the saved terminalProfile into the process-wide Terminal state", async () => {
 		const setTerminalProfileSpy = vi.spyOn(Terminal, "setTerminalProfile").mockImplementation(() => {})
 		// Seed the persisted setting so the real getState() returns it during hydration.
@@ -503,6 +614,49 @@ describe("ClineProvider", () => {
 		})
 
 		expect(mockWebviewView.webview.html).toContain("<!DOCTYPE html>")
+		expect(mockWebviewView.webview.html).toContain("<title>Zoo Code</title>")
+	})
+
+	describe("logWebviewHiddenDiagnostics", () => {
+		let visibilityCallback: () => void
+
+		beforeEach(async () => {
+			// Capture the visibility callback registered during resolveWebviewView
+			mockWebviewView.onDidChangeVisibility = vi.fn().mockImplementation((cb: () => void) => {
+				visibilityCallback = cb
+				return { dispose: vi.fn() }
+			})
+			// @ts-ignore - accessing private property for testing
+			provider.view = mockWebviewView
+			await provider.resolveWebviewView(mockWebviewView)
+			;(mockOutputChannel.appendLine as ReturnType<typeof vi.fn>).mockClear()
+		})
+
+		test("does not log when no task is active", () => {
+			// view becomes hidden with no task on the stack
+			Object.defineProperty(mockWebviewView, "visible", { value: false, configurable: true })
+			visibilityCallback()
+			expect(mockOutputChannel.appendLine).not.toHaveBeenCalled()
+		})
+
+		test("does not log when the active task is aborted", async () => {
+			const task = new Task(defaultTaskOptions)
+			Object.defineProperty(task, "taskId", { value: "aborted-task", writable: true })
+			task.abort = true
+			await provider.addClineToStack(task)
+			Object.defineProperty(mockWebviewView, "visible", { value: false, configurable: true })
+			visibilityCallback()
+			expect(mockOutputChannel.appendLine).not.toHaveBeenCalled()
+		})
+
+		test("logs task state to output channel when an active task is running", async () => {
+			const task = new Task(defaultTaskOptions)
+			Object.defineProperty(task, "taskId", { value: "running-task", writable: true })
+			await provider.addClineToStack(task)
+			Object.defineProperty(mockWebviewView, "visible", { value: false, configurable: true })
+			visibilityCallback()
+			expect(mockOutputChannel.appendLine).toHaveBeenCalledWith(expect.stringContaining("running-task"))
+		})
 	})
 
 	test("resolveWebviewView sets up webview correctly in development mode even if local server is not running", async () => {
@@ -593,6 +747,7 @@ describe("ClineProvider", () => {
 			openRouterImageGenerationSelectedModel: undefined,
 			taskSyncEnabled: false,
 			checkpointTimeout: DEFAULT_CHECKPOINT_TIMEOUT_SECONDS,
+			diffFuzzyThreshold: DEFAULT_DIFF_FUZZY_THRESHOLD,
 		}
 
 		const message: ExtensionMessage = {
@@ -668,13 +823,37 @@ describe("ClineProvider", () => {
 		await provider.resolveWebviewView(mockWebviewView)
 
 		// Get the message handler from onDidReceiveMessage
-		const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as any).mock.calls[0][0]
+		const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as ReturnType<typeof vi.fn>).mock
+			.calls[0][0]
 
 		// Simulate webviewDidLaunch message
 		await messageHandler({ type: "webviewDidLaunch" })
 
 		// Should post state and theme to webview
 		expect(mockPostMessage).toHaveBeenCalled()
+	})
+
+	test("logs detached workspace initialization failures", async () => {
+		await provider.resolveWebviewView(mockWebviewView)
+
+		let rejectInitialization!: (error: Error) => void
+		const initializationPromise = new Promise<void>((_, reject) => {
+			rejectInitialization = reject
+		})
+		const initializeSpy = vi
+			.spyOn(provider.workspaceTracker!, "initializeFilePaths")
+			.mockReturnValue(initializationPromise)
+		const logSpy = vi.spyOn(provider, "log")
+		const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as any).mock.calls[0][0]
+
+		await expect(messageHandler({ type: "webviewDidLaunch" })).resolves.toBeUndefined()
+		expect(initializeSpy).toHaveBeenCalledOnce()
+
+		rejectInitialization(new Error("workspace boom"))
+		await Promise.resolve()
+		await Promise.resolve()
+
+		expect(logSpy).toHaveBeenCalledWith("Workspace initialization error: Error: workspace boom")
 	})
 
 	test("clearTask aborts current task", async () => {
@@ -842,12 +1021,54 @@ describe("ClineProvider", () => {
 
 	test("writeDelayMs defaults to 1000ms", async () => {
 		// Mock globalState.get to return undefined for writeDelayMs
-		;(mockContext.globalState.get as any).mockImplementation((key: string) =>
-			key === "writeDelayMs" ? undefined : null,
-		)
+		;(mockContext.globalState.get as any).mockImplementation((key: string) => {
+			return key === "writeDelayMs" ? undefined : null
+		})
 
 		const state = await provider.getState()
 		expect(state.writeDelayMs).toBe(1000)
+	})
+
+	test("getState applies fallback defaults for write, diff, and terminal settings", async () => {
+		;(mockContext.globalState.get as any).mockImplementation((key: string) => {
+			if (
+				[
+					"writeDelayMs",
+					"diffFuzzyThreshold",
+					"terminalShellIntegrationTimeout",
+					"terminalShellIntegrationDisabled",
+					"terminalCommandDelay",
+				].includes(key)
+			) {
+				return undefined
+			}
+
+			return null
+		})
+
+		const state = await provider.getState()
+
+		expect(state.writeDelayMs).toBe(DEFAULT_WRITE_DELAY_MS)
+		expect(state.diffFuzzyThreshold).toBe(DEFAULT_DIFF_FUZZY_THRESHOLD)
+		expect(state.terminalShellIntegrationTimeout).toBe(Terminal.defaultShellIntegrationTimeout)
+		expect(state.terminalShellIntegrationDisabled).toBe(true)
+		expect(state.terminalCommandDelay).toBe(0)
+	})
+
+	test("getState passes through defined write/diff/terminal values instead of defaults", async () => {
+		await provider.contextProxy.setValue("writeDelayMs", 500)
+		await provider.contextProxy.setValue("diffFuzzyThreshold", 0.5)
+		await provider.contextProxy.setValue("terminalShellIntegrationTimeout", 99999)
+		await provider.contextProxy.setValue("terminalShellIntegrationDisabled", false)
+		await provider.contextProxy.setValue("terminalCommandDelay", 1234)
+
+		const state = await provider.getState()
+
+		expect(state.writeDelayMs).toBe(500)
+		expect(state.diffFuzzyThreshold).toBe(0.5)
+		expect(state.terminalShellIntegrationTimeout).toBe(99999)
+		expect(state.terminalShellIntegrationDisabled).toBe(false)
+		expect(state.terminalCommandDelay).toBe(1234)
 	})
 
 	test("handles writeDelayMs message", async () => {
@@ -893,9 +1114,9 @@ describe("ClineProvider", () => {
 
 	test("autoCondenseContext defaults to true", async () => {
 		// Mock globalState.get to return undefined for autoCondenseContext
-		;(mockContext.globalState.get as any).mockImplementation((key: string) =>
-			key === "autoCondenseContext" ? undefined : null,
-		)
+		;(mockContext.globalState.get as any).mockImplementation((key: string) => {
+			return key === "autoCondenseContext" ? undefined : null
+		})
 		const state = await provider.getState()
 		expect(state.autoCondenseContext).toBe(true)
 	})
@@ -911,9 +1132,9 @@ describe("ClineProvider", () => {
 
 	test("autoCondenseContextPercent defaults to 100", async () => {
 		// Mock globalState.get to return undefined for autoCondenseContextPercent
-		;(mockContext.globalState.get as any).mockImplementation((key: string) =>
-			key === "autoCondenseContextPercent" ? undefined : null,
-		)
+		;(mockContext.globalState.get as any).mockImplementation((key: string) => {
+			return key === "autoCondenseContextPercent" ? undefined : null
+		})
 
 		const state = await provider.getState()
 		expect(state.autoCondenseContextPercent).toBe(100)
@@ -928,6 +1149,65 @@ describe("ClineProvider", () => {
 		expect(updateGlobalStateSpy).toHaveBeenCalledWith("autoCondenseContextPercent", 75)
 		expect(mockContext.globalState.update).toHaveBeenCalledWith("autoCondenseContextPercent", 75)
 		expect(mockPostMessage).toHaveBeenCalled()
+	})
+
+	describe("auto-close settings are included in posted state", () => {
+		it("getStateToPostToWebview returns saved autoCloseZooOpenedFiles value", async () => {
+			await provider.resolveWebviewView(mockWebviewView)
+
+			// Simulate the updateSettings handler storing the value.
+			await provider.contextProxy.setValue("autoCloseZooOpenedFiles", false)
+			await provider.contextProxy.setValue("autoCloseZooOpenedFilesAfterUserEdited", true)
+			await provider.contextProxy.setValue("autoCloseZooOpenedNewFiles", true)
+
+			const state = await provider.getStateToPostToWebview()
+
+			// The saved values must be present in the state posted to the webview.
+			expect(state.autoCloseZooOpenedFiles).toBe(false)
+			expect(state.autoCloseZooOpenedFilesAfterUserEdited).toBe(true)
+			expect(state.autoCloseZooOpenedNewFiles).toBe(true)
+		})
+
+		it("getStateToPostToWebview defaults autoCloseZooOpenedFiles to false when unset", async () => {
+			await provider.resolveWebviewView(mockWebviewView)
+
+			// Ensure the settings are not set.
+			await provider.contextProxy.setValue("autoCloseZooOpenedFiles", undefined)
+			await provider.contextProxy.setValue("autoCloseZooOpenedFilesAfterUserEdited", undefined)
+			await provider.contextProxy.setValue("autoCloseZooOpenedNewFiles", undefined)
+
+			const state = await provider.getStateToPostToWebview()
+
+			// Unset values should default to their documented defaults (opt-in).
+			expect(state.autoCloseZooOpenedFiles).toBe(false)
+			expect(state.autoCloseZooOpenedFilesAfterUserEdited).toBe(false)
+			expect(state.autoCloseZooOpenedNewFiles).toBe(false)
+		})
+
+		it("getState returns saved autoCloseZooOpenedFiles value for DiffViewProvider", async () => {
+			await provider.resolveWebviewView(mockWebviewView)
+
+			await provider.contextProxy.setValue("autoCloseZooOpenedFiles", false)
+			await provider.contextProxy.setValue("autoCloseZooOpenedFilesAfterUserEdited", true)
+			await provider.contextProxy.setValue("autoCloseZooOpenedNewFiles", true)
+
+			const state = await provider.getState()
+
+			// DiffViewProvider reads from getState(); all three fields must be present
+			// so a regression that drops any of them is caught.
+			expect(state.autoCloseZooOpenedFiles).toBe(false)
+			expect(state.autoCloseZooOpenedFilesAfterUserEdited).toBe(true)
+			expect(state.autoCloseZooOpenedNewFiles).toBe(true)
+		})
+	})
+
+	it("getStateToPostToWebview passes through defined diffFuzzyThreshold value", async () => {
+		await provider.resolveWebviewView(mockWebviewView)
+		await provider.contextProxy.setValue("diffFuzzyThreshold", 0.5)
+
+		const state = await provider.getStateToPostToWebview()
+
+		expect(state.diffFuzzyThreshold).toBe(0.5)
 	})
 
 	it("loads saved API config when switching modes", async () => {
@@ -965,7 +1245,7 @@ describe("ClineProvider", () => {
 			setModeConfig: vi.fn(),
 		} as any
 
-		provider.setValue("currentApiConfigName", "current-config")
+		await provider.setValue("currentApiConfigName", "current-config")
 
 		// Switch to architect mode
 		await messageHandler({ type: "mode", text: "architect" })
@@ -1063,7 +1343,7 @@ describe("ClineProvider", () => {
 			},
 		}
 
-		provider.setValue("customModePrompts", existingPrompts)
+		await provider.setValue("customModePrompts", existingPrompts)
 
 		// Test updating a prompt
 		await messageHandler({
@@ -1273,7 +1553,7 @@ describe("ClineProvider", () => {
 
 		test("handles case when no current task exists", async () => {
 			// Clear the cline stack
-			;(provider as any).clineStack = []
+			Object.assign(provider, { taskRegistry: new TaskRegistry() })
 
 			// Trigger message deletion
 			const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as any).mock.calls[0][0]
@@ -2055,11 +2335,402 @@ describe("ClineProvider", () => {
 	})
 })
 
+describe("webviewMessageHandler no-floating-promises coverage", () => {
+	const createProvider = (overrides: Record<string, unknown> = {}) =>
+		Object.assign(
+			{
+				context: {
+					secrets: {
+						get: vi.fn().mockResolvedValue(undefined),
+					},
+				},
+				contextProxy: {
+					getValue: vi.fn(),
+					setValue: vi.fn().mockResolvedValue(undefined),
+				},
+				postMessageToWebview: vi.fn().mockResolvedValue(true),
+				postStateToWebview: vi.fn().mockResolvedValue(undefined),
+				getCurrentTask: vi.fn(),
+				getCurrentWorkspaceCodeIndexManager: vi.fn(),
+				getMcpHub: vi.fn().mockReturnValue({
+					getMcpSettingsFilePath: vi.fn().mockResolvedValue("/test/mcp.json"),
+				}),
+				providerSettingsManager: {
+					listConfig: vi.fn().mockResolvedValue([]),
+				},
+				customModesManager: {
+					getCustomModesFilePath: vi.fn().mockResolvedValue("/test/custom-modes.yaml"),
+					exportModeWithRules: vi.fn(),
+					importModeWithRules: vi.fn(),
+					getCustomModes: vi.fn().mockResolvedValue([]),
+					checkRulesDirectoryHasContent: vi.fn().mockResolvedValue(true),
+				},
+				exportTaskWithId: vi.fn().mockResolvedValue(undefined),
+				showTaskWithId: vi.fn().mockResolvedValue(undefined),
+				condenseTaskContext: vi.fn().mockResolvedValue(undefined),
+				deleteTaskWithId: vi.fn().mockResolvedValue(undefined),
+				log: vi.fn(),
+				cwd: "/test/workspace",
+			},
+			overrides,
+		) as unknown as ClineProvider
+
+	const createIndexManager = (overrides: Record<string, unknown> = {}) =>
+		Object.assign(
+			{
+				setWorkspaceEnabled: vi.fn().mockResolvedValue(undefined),
+				setAutoEnableDefault: vi.fn().mockResolvedValue(undefined),
+				isFeatureEnabled: true,
+				isFeatureConfigured: true,
+				isWorkspaceEnabled: true,
+				initialize: vi.fn().mockResolvedValue(undefined),
+				state: "Standby",
+				isInitialized: true,
+				startIndexing: vi.fn().mockResolvedValue(undefined),
+				stopIndexing: vi.fn(),
+				clearIndexData: vi.fn().mockResolvedValue(undefined),
+				getCurrentStatus: vi.fn().mockReturnValue({ systemStatus: "Standby" }),
+			},
+			overrides,
+		)
+
+	beforeEach(() => {
+		vi.clearAllMocks()
+	})
+
+	it("logs a detached indexing rejection without rejecting the handler", async () => {
+		let rejectIndexing!: (error: Error) => void
+		const indexingPromise = new Promise<void>((_, reject) => {
+			rejectIndexing = reject
+		})
+		const manager = createIndexManager({
+			startIndexing: vi.fn().mockReturnValue(indexingPromise),
+		})
+		const provider = createProvider({
+			getCurrentWorkspaceCodeIndexManager: vi.fn().mockReturnValue(manager),
+		})
+
+		await expect(webviewMessageHandler(provider, { type: "startIndexing" })).resolves.toBeUndefined()
+		expect(manager.startIndexing).toHaveBeenCalledOnce()
+
+		rejectIndexing(new Error("boom"))
+		await Promise.resolve()
+		await Promise.resolve()
+
+		expect(provider.log).toHaveBeenCalledWith("Indexing error: Error: boom")
+	})
+
+	it("covers the changed task-operation happy paths", async () => {
+		const task = {
+			taskId: "task-1",
+			handleTerminalOperation: vi.fn().mockResolvedValue(undefined),
+		}
+		const provider = createProvider({ getCurrentTask: vi.fn().mockReturnValue(task) })
+
+		await webviewMessageHandler(provider, { type: "terminalOperation", terminalOperation: "continue" })
+		await webviewMessageHandler(provider, { type: "exportCurrentTask" })
+		await webviewMessageHandler(provider, { type: "showTaskWithId", text: "task-2" })
+		await webviewMessageHandler(provider, { type: "condenseTaskContextRequest", text: "task-2" })
+		await webviewMessageHandler(provider, { type: "deleteTaskWithId", text: "task-2" })
+		await webviewMessageHandler(provider, { type: "exportTaskWithId", text: "task-2" })
+
+		expect(task.handleTerminalOperation).toHaveBeenCalledWith("continue")
+		expect(provider.exportTaskWithId).toHaveBeenCalledTimes(2)
+		expect(provider.showTaskWithId).toHaveBeenCalledWith("task-2")
+		expect(provider.condenseTaskContext).toHaveBeenCalledWith("task-2")
+		expect(provider.deleteTaskWithId).toHaveBeenCalledWith("task-2")
+	})
+
+	it("covers changed file, image, mention, settings, and TTS dispatch paths", async () => {
+		const { openFile } = await import("../../../integrations/misc/open-file")
+		const { openImage, saveImage } = await import("../../../integrations/misc/image-handler")
+		const { openMention } = await import("../../mentions")
+		const { playTts } = await import("../../../utils/tts")
+		const provider = createProvider()
+
+		await webviewMessageHandler(provider, { type: "openImage", text: "/test/image.png" })
+		await webviewMessageHandler(provider, { type: "saveImage", dataUri: "invalid" })
+		await webviewMessageHandler(provider, { type: "openFile", text: "/test/file.ts" })
+		await webviewMessageHandler(provider, { type: "openMention", text: "file.ts" })
+		await webviewMessageHandler(provider, { type: "openCustomModesSettings" })
+		await webviewMessageHandler(provider, { type: "openMcpSettings" })
+		await webviewMessageHandler(provider, { type: "playTts", text: "hello" })
+
+		expect(openImage).toHaveBeenCalledWith("/test/image.png", { values: undefined })
+		expect(saveImage).toHaveBeenCalledOnce()
+		expect(openFile).toHaveBeenCalledTimes(3)
+		expect(openMention).toHaveBeenCalledWith("/test/workspace", "file.ts")
+		expect(playTts).toHaveBeenCalledOnce()
+	})
+
+	it("covers changed configuration and rules response paths", async () => {
+		const provider = createProvider()
+
+		await webviewMessageHandler(provider, { type: "getListApiConfiguration" })
+		await webviewMessageHandler(provider, { type: "checkRulesDirectory", slug: "mode-1" })
+
+		expect(provider.postMessageToWebview).toHaveBeenCalledWith({ type: "listApiConfig", listApiConfig: [] })
+		expect(provider.postMessageToWebview).toHaveBeenCalledWith({
+			type: "checkRulesDirectoryResult",
+			slug: "mode-1",
+			hasContent: true,
+		})
+	})
+
+	it("covers all changed export-mode response paths", async () => {
+		const provider = createProvider()
+		const exportModeWithRules = provider.customModesManager.exportModeWithRules as ReturnType<typeof vi.fn>
+		const showSaveDialog = vi.mocked(vscode.window.showSaveDialog)
+
+		exportModeWithRules.mockResolvedValueOnce({ success: true, yaml: "mode: one" })
+		showSaveDialog.mockResolvedValueOnce({ fsPath: "/test/mode.yaml" } as vscode.Uri)
+		await webviewMessageHandler(provider, { type: "exportMode", slug: "mode-1" })
+
+		exportModeWithRules.mockResolvedValueOnce({ success: true, yaml: "mode: one" })
+		showSaveDialog.mockResolvedValueOnce(undefined)
+		await webviewMessageHandler(provider, { type: "exportMode", slug: "mode-1" })
+
+		exportModeWithRules.mockResolvedValueOnce({ success: false, error: "invalid mode" })
+		await webviewMessageHandler(provider, { type: "exportMode", slug: "mode-1" })
+
+		exportModeWithRules.mockRejectedValueOnce(new Error("export failed"))
+		await webviewMessageHandler(provider, { type: "exportMode", slug: "mode-1" })
+
+		expect(provider.postMessageToWebview).toHaveBeenCalledWith(
+			expect.objectContaining({ type: "exportModeResult", success: true }),
+		)
+		expect(provider.postMessageToWebview).toHaveBeenCalledWith(
+			expect.objectContaining({ type: "exportModeResult", error: "Export cancelled" }),
+		)
+		expect(provider.postMessageToWebview).toHaveBeenCalledWith(
+			expect.objectContaining({ type: "exportModeResult", error: "invalid mode" }),
+		)
+		expect(provider.postMessageToWebview).toHaveBeenCalledWith(
+			expect.objectContaining({ type: "exportModeResult", error: "export failed" }),
+		)
+	})
+
+	it("covers all changed import-mode response paths", async () => {
+		const provider = createProvider()
+		const importModeWithRules = provider.customModesManager.importModeWithRules as ReturnType<typeof vi.fn>
+		const showOpenDialog = vi.mocked(vscode.window.showOpenDialog)
+		const selectedFile = [{ fsPath: "/test/mode.yaml" } as vscode.Uri]
+
+		showOpenDialog.mockResolvedValueOnce(selectedFile)
+		importModeWithRules.mockResolvedValueOnce({ success: true, slug: "mode-1" })
+		await webviewMessageHandler(provider, { type: "importMode", source: "project" })
+
+		showOpenDialog.mockResolvedValueOnce(selectedFile)
+		importModeWithRules.mockResolvedValueOnce({ success: false, error: "invalid mode" })
+		await webviewMessageHandler(provider, { type: "importMode", source: "project" })
+
+		showOpenDialog.mockResolvedValueOnce(undefined)
+		await webviewMessageHandler(provider, { type: "importMode", source: "project" })
+
+		showOpenDialog.mockRejectedValueOnce(new Error("dialog failed"))
+		await webviewMessageHandler(provider, { type: "importMode", source: "project" })
+
+		expect(provider.postMessageToWebview).toHaveBeenCalledWith(
+			expect.objectContaining({ type: "importModeResult", success: true }),
+		)
+		expect(provider.postMessageToWebview).toHaveBeenCalledWith(
+			expect.objectContaining({ type: "importModeResult", error: "invalid mode" }),
+		)
+		expect(provider.postMessageToWebview).toHaveBeenCalledWith(
+			expect.objectContaining({ type: "importModeResult", error: "cancelled" }),
+		)
+		expect(provider.postMessageToWebview).toHaveBeenCalledWith(
+			expect.objectContaining({ type: "importModeResult", error: "dialog failed" }),
+		)
+	})
+
+	it("covers changed cloud sign-out and rate-limit error responses", async () => {
+		const { CloudService } = await import("@roo-code/cloud")
+		const { openAiCodexOAuthManager } = await import("../../../integrations/openai-codex/oauth")
+		const provider = createProvider()
+
+		vi.mocked(CloudService.hasInstance).mockReturnValueOnce(false)
+		await webviewMessageHandler(provider, { type: "rooCloudSignOut" })
+		await webviewMessageHandler(provider, { type: "rooCloudSignOut" })
+
+		vi.mocked(openAiCodexOAuthManager.getAccessToken).mockRejectedValueOnce(new Error("token failed"))
+		await webviewMessageHandler(provider, { type: "requestOpenAiCodexRateLimits" })
+
+		expect(provider.postMessageToWebview).toHaveBeenCalledWith({
+			type: "openAiCodexRateLimits",
+			error: "token failed",
+		})
+	})
+
+	it("covers changed indexing status, secret, and missing-manager responses", async () => {
+		const manager = createIndexManager()
+		const getManager = vi.fn().mockReturnValueOnce(undefined).mockReturnValue(manager)
+		const provider = createProvider({ getCurrentWorkspaceCodeIndexManager: getManager })
+
+		await webviewMessageHandler(provider, { type: "requestIndexingStatus" })
+		await webviewMessageHandler(provider, { type: "requestIndexingStatus" })
+		await webviewMessageHandler(provider, { type: "requestCodeIndexSecretStatus" })
+		getManager.mockReturnValueOnce(undefined)
+		await webviewMessageHandler(provider, { type: "startIndexing" })
+
+		expect(provider.postMessageToWebview).toHaveBeenCalledWith(
+			expect.objectContaining({ type: "codeIndexSecretStatus" }),
+		)
+		expect(provider.log).toHaveBeenCalledWith("Cannot start indexing: No workspace folder open")
+	})
+
+	it("catches both start-indexing calls during error recovery", async () => {
+		const manager = createIndexManager({
+			isInitialized: false,
+			startIndexing: vi
+				.fn()
+				.mockRejectedValueOnce(new Error("first failure"))
+				.mockRejectedValueOnce(new Error("second failure")),
+		})
+		const provider = createProvider({
+			getCurrentWorkspaceCodeIndexManager: vi.fn().mockReturnValue(manager),
+		})
+
+		await webviewMessageHandler(provider, { type: "startIndexing" })
+		await Promise.resolve()
+
+		expect(manager.startIndexing).toHaveBeenCalledTimes(2)
+		expect(provider.log).toHaveBeenCalledWith("Indexing error: Error: first failure")
+		expect(provider.log).toHaveBeenCalledWith("Indexing error: Error: second failure")
+	})
+
+	it("covers changed stop, toggle, and detached toggle rejection paths", async () => {
+		const manager = createIndexManager({
+			startIndexing: vi.fn().mockRejectedValue(new Error("toggle failure")),
+		})
+		const provider = createProvider({
+			getCurrentWorkspaceCodeIndexManager: vi.fn().mockReturnValue(manager),
+		})
+
+		await webviewMessageHandler(provider, { type: "stopIndexing" })
+		await webviewMessageHandler(provider, { type: "toggleWorkspaceIndexing", bool: true })
+		await Promise.resolve()
+
+		expect(manager.stopIndexing).toHaveBeenCalledOnce()
+		expect(provider.log).toHaveBeenCalledWith("Indexing error: Error: toggle failure")
+		expect(provider.postMessageToWebview).toHaveBeenCalledWith(
+			expect.objectContaining({ type: "indexingStatusUpdate" }),
+		)
+	})
+
+	it("catches auto-enabled indexing failures and posts the resulting status", async () => {
+		const { CodeIndexManager } = await import("../../../services/code-index/manager")
+		let workspaceEnabled = false
+		const manager = createIndexManager({
+			setAutoEnableDefault: vi.fn().mockImplementation(async () => {
+				workspaceEnabled = true
+			}),
+			startIndexing: vi.fn().mockRejectedValue(new Error("auto-enable failure")),
+		})
+		Object.defineProperty(manager, "isWorkspaceEnabled", { get: () => workspaceEnabled })
+		const getAllInstances = vi
+			.spyOn(CodeIndexManager, "getAllInstances")
+			.mockReturnValue([manager] as unknown as ReturnType<typeof CodeIndexManager.getAllInstances>)
+		const provider = createProvider({
+			getCurrentWorkspaceCodeIndexManager: vi.fn().mockReturnValue(manager),
+		})
+
+		try {
+			await webviewMessageHandler(provider, { type: "setAutoEnableDefault", bool: true })
+			await Promise.resolve()
+
+			expect(manager.startIndexing).toHaveBeenCalledOnce()
+			expect(provider.log).toHaveBeenCalledWith("Indexing error: Error: auto-enable failure")
+			expect(provider.postMessageToWebview).toHaveBeenCalledWith(
+				expect.objectContaining({ type: "indexingStatusUpdate" }),
+			)
+		} finally {
+			getAllInstances.mockRestore()
+		}
+	})
+
+	it("covers changed clear-index response paths", async () => {
+		const manager = createIndexManager()
+		const getManager = vi.fn().mockReturnValueOnce(undefined).mockReturnValue(manager)
+		const provider = createProvider({ getCurrentWorkspaceCodeIndexManager: getManager })
+
+		await webviewMessageHandler(provider, { type: "clearIndexData" })
+		await webviewMessageHandler(provider, { type: "clearIndexData" })
+		manager.clearIndexData.mockRejectedValueOnce(new Error("clear failed"))
+		await webviewMessageHandler(provider, { type: "clearIndexData" })
+
+		expect(provider.postMessageToWebview).toHaveBeenCalledWith({
+			type: "indexCleared",
+			values: { success: true },
+		})
+		expect(provider.postMessageToWebview).toHaveBeenCalledWith({
+			type: "indexCleared",
+			values: { success: false, error: "clear failed" },
+		})
+	})
+
+	it("covers changed marketplace error and removal responses", async () => {
+		const provider = createProvider()
+		const item = {
+			id: "item-1",
+			name: "Item 1",
+			description: "Test marketplace item",
+			type: "mode",
+			content: "slug: item-1",
+		} satisfies NonNullable<WebviewMessage["mpItem"]>
+		const options = { target: "project" } satisfies NonNullable<WebviewMessage["mpInstallOptions"]>
+		const marketplaceManager = {
+			installMarketplaceItem: vi.fn().mockRejectedValue(new Error("install failed")),
+			removeInstalledMarketplaceItem: vi
+				.fn()
+				.mockResolvedValueOnce(undefined)
+				.mockRejectedValueOnce(new Error("remove failed")),
+		}
+		const managerArgument = marketplaceManager as unknown as NonNullable<
+			Parameters<typeof webviewMessageHandler>[2]
+		>
+
+		await webviewMessageHandler(
+			provider,
+			{ type: "installMarketplaceItem", mpItem: item, mpInstallOptions: options },
+			managerArgument,
+		)
+		await webviewMessageHandler(
+			provider,
+			{ type: "removeInstalledMarketplaceItem", mpItem: item, mpInstallOptions: options },
+			managerArgument,
+		)
+		await webviewMessageHandler(
+			provider,
+			{ type: "removeInstalledMarketplaceItem", mpItem: item, mpInstallOptions: options },
+			managerArgument,
+		)
+		await webviewMessageHandler(provider, {
+			type: "removeInstalledMarketplaceItem",
+			mpItem: item,
+			mpInstallOptions: options,
+		})
+
+		expect(provider.postMessageToWebview).toHaveBeenCalledWith(
+			expect.objectContaining({ type: "marketplaceInstallResult", success: false }),
+		)
+		expect(provider.postMessageToWebview).toHaveBeenCalledWith(
+			expect.objectContaining({ type: "marketplaceRemoveResult", success: true }),
+		)
+		expect(provider.postMessageToWebview).toHaveBeenCalledWith(
+			expect.objectContaining({ type: "marketplaceRemoveResult", error: "remove failed" }),
+		)
+		expect(provider.postMessageToWebview).toHaveBeenCalledWith(
+			expect.objectContaining({ type: "marketplaceRemoveResult", error: "Marketplace manager is not available" }),
+		)
+	})
+})
+
 describe("Project MCP Settings", () => {
 	let provider: ClineProvider
 	let mockContext: vscode.ExtensionContext
 	let mockOutputChannel: vscode.OutputChannel
-	let mockWebviewView: vscode.WebviewView
+	let mockWebviewView: any
 	let mockPostMessage: any
 
 	beforeEach(async () => {
@@ -2113,7 +2784,7 @@ describe("Project MCP Settings", () => {
 			visible: true,
 			onDidDispose: vi.fn(),
 			onDidChangeVisibility: vi.fn(),
-		} as unknown as vscode.WebviewView
+		}
 		;(vscode.window as any).activeTextEditor = undefined
 		;(vscode.workspace.getWorkspaceFolder as any).mockReset()
 		provider = new ClineProvider(mockContext, mockOutputChannel, "sidebar", new ContextProxy(mockContext))
@@ -2376,7 +3047,7 @@ describe("ClineProvider - Router Models", () => {
 	let provider: ClineProvider
 	let mockContext: vscode.ExtensionContext
 	let mockOutputChannel: vscode.OutputChannel
-	let mockWebviewView: vscode.WebviewView
+	let mockWebviewView: any
 	let mockPostMessage: any
 
 	beforeEach(() => {
@@ -2389,16 +3060,26 @@ describe("ClineProvider - Router Models", () => {
 			extensionPath: "/test/path",
 			extensionUri: { fsPath: "/test/path" } as vscode.Uri,
 			globalState: {
-				get: vi.fn().mockImplementation((key: string) => globalState[key]),
-				update: vi
-					.fn()
-					.mockImplementation((key: string, value: string | undefined) => (globalState[key] = value)),
-				keys: vi.fn().mockImplementation(() => Object.keys(globalState)),
+				get: vi.fn().mockImplementation((key: string) => {
+					return globalState[key]
+				}),
+				update: vi.fn().mockImplementation((key: string, value: string | undefined) => {
+					return (globalState[key] = value)
+				}),
+				keys: vi.fn().mockImplementation(() => {
+					return Object.keys(globalState)
+				}),
 			},
 			secrets: {
-				get: vi.fn().mockImplementation((key: string) => secrets[key]),
-				store: vi.fn().mockImplementation((key: string, value: string | undefined) => (secrets[key] = value)),
-				delete: vi.fn().mockImplementation((key: string) => delete secrets[key]),
+				get: vi.fn().mockImplementation((key: string) => {
+					return secrets[key]
+				}),
+				store: vi.fn().mockImplementation((key: string, value: string | undefined) => {
+					return (secrets[key] = value)
+				}),
+				delete: vi.fn().mockImplementation((key: string) => {
+					return delete secrets[key]
+				}),
 			},
 			workspaceState: {
 				get: vi.fn().mockReturnValue(undefined),
@@ -2434,8 +3115,10 @@ describe("ClineProvider - Router Models", () => {
 				callback()
 				return { dispose: vi.fn() }
 			}),
-			onDidChangeVisibility: vi.fn().mockImplementation(() => ({ dispose: vi.fn() })),
-		} as unknown as vscode.WebviewView
+			onDidChangeVisibility: vi.fn().mockImplementation(() => {
+				return { dispose: vi.fn() }
+			}),
+		}
 
 		if (!TelemetryService.hasInstance()) {
 			TelemetryService.createInstance([])
@@ -2488,6 +3171,10 @@ describe("ClineProvider - Router Models", () => {
 			apiKey: "litellm-key",
 			baseUrl: "http://localhost:4000",
 		})
+		// Opencode Go's /models endpoint is public, so it is fetched like the other no-auth routers.
+		expect(getModels).toHaveBeenCalledWith(expect.objectContaining({ provider: "opencode-go" }))
+		// Kenari's /models endpoint is public, so it is fetched like the other no-auth routers.
+		expect(getModels).toHaveBeenCalledWith(expect.objectContaining({ provider: "kenari" }))
 
 		// Verify response was sent
 		expect(mockPostMessage).toHaveBeenCalledWith({
@@ -2503,7 +3190,10 @@ describe("ClineProvider - Router Models", () => {
 				lmstudio: {},
 				poe: {},
 				deepseek: {},
-				"opencode-go": {},
+				moonshot: {},
+				"opencode-go": mockModels,
+				kenari: mockModels,
+				"kimi-code": {},
 			},
 			values: undefined,
 		})
@@ -2535,6 +3225,8 @@ describe("ClineProvider - Router Models", () => {
 			.mockResolvedValueOnce(mockModels) // vercel-ai-gateway success
 			.mockResolvedValueOnce(mockModels) // zoo-gateway success
 			.mockRejectedValueOnce(new Error("LiteLLM connection failed")) // litellm fail
+			.mockResolvedValueOnce(mockModels) // opencode-go (public endpoint)
+			.mockResolvedValueOnce(mockModels) // kenari (public endpoint)
 
 		await messageHandler({ type: "requestRouterModels" })
 
@@ -2552,7 +3244,10 @@ describe("ClineProvider - Router Models", () => {
 				litellm: {},
 				poe: {},
 				deepseek: {},
-				"opencode-go": {},
+				moonshot: {},
+				"opencode-go": mockModels,
+				kenari: mockModels,
+				"kimi-code": {},
 			},
 			values: undefined,
 		})
@@ -2649,7 +3344,10 @@ describe("ClineProvider - Router Models", () => {
 				lmstudio: {},
 				poe: {},
 				deepseek: {},
-				"opencode-go": {},
+				moonshot: {},
+				"opencode-go": mockModels,
+				kenari: mockModels,
+				"kimi-code": {},
 			},
 			values: undefined,
 		})
@@ -2687,7 +3385,7 @@ describe("ClineProvider - Comprehensive Edit/Delete Edge Cases", () => {
 	let provider: ClineProvider
 	let mockContext: vscode.ExtensionContext
 	let mockOutputChannel: vscode.OutputChannel
-	let mockWebviewView: vscode.WebviewView
+	let mockWebviewView: any
 	let mockPostMessage: any
 	let defaultTaskOptions: TaskOptions
 
@@ -2709,16 +3407,26 @@ describe("ClineProvider - Comprehensive Edit/Delete Edge Cases", () => {
 			extensionPath: "/test/path",
 			extensionUri: { fsPath: "/test/path" } as vscode.Uri,
 			globalState: {
-				get: vi.fn().mockImplementation((key: string) => globalState[key]),
-				update: vi
-					.fn()
-					.mockImplementation((key: string, value: string | undefined) => (globalState[key] = value)),
-				keys: vi.fn().mockImplementation(() => Object.keys(globalState)),
+				get: vi.fn().mockImplementation((key: string) => {
+					return globalState[key]
+				}),
+				update: vi.fn().mockImplementation((key: string, value: string | undefined) => {
+					return (globalState[key] = value)
+				}),
+				keys: vi.fn().mockImplementation(() => {
+					return Object.keys(globalState)
+				}),
 			},
 			secrets: {
-				get: vi.fn().mockImplementation((key: string) => secrets[key]),
-				store: vi.fn().mockImplementation((key: string, value: string | undefined) => (secrets[key] = value)),
-				delete: vi.fn().mockImplementation((key: string) => delete secrets[key]),
+				get: vi.fn().mockImplementation((key: string) => {
+					return secrets[key]
+				}),
+				store: vi.fn().mockImplementation((key: string, value: string | undefined) => {
+					return (secrets[key] = value)
+				}),
+				delete: vi.fn().mockImplementation((key: string) => {
+					return delete secrets[key]
+				}),
 			},
 			workspaceState: {
 				get: vi.fn().mockReturnValue(undefined),
@@ -2755,8 +3463,10 @@ describe("ClineProvider - Comprehensive Edit/Delete Edge Cases", () => {
 				callback()
 				return { dispose: vi.fn() }
 			}),
-			onDidChangeVisibility: vi.fn().mockImplementation(() => ({ dispose: vi.fn() })),
-		} as unknown as vscode.WebviewView
+			onDidChangeVisibility: vi.fn().mockImplementation(() => {
+				return { dispose: vi.fn() }
+			}),
+		}
 
 		provider = new ClineProvider(mockContext, mockOutputChannel, "sidebar", new ContextProxy(mockContext))
 
@@ -3707,12 +4417,14 @@ describe("ClineProvider - Comprehensive Edit/Delete Edge Cases", () => {
 				} as any)
 				const upsertSpy = vi.spyOn(provider, "upsertProviderProfile").mockResolvedValue("profile-id")
 				vi.spyOn(provider, "postStateToWebview").mockResolvedValue(undefined)
+				const postMessageSpy = vi.spyOn(provider, "postMessageToWebview").mockResolvedValue(undefined)
 				;(provider as any).providerSettingsManager = {
 					listConfig: vi.fn().mockResolvedValue([]),
 				}
 
 				await provider.handleZooCodeCallback("zoo_ext_token")
 
+				expect(postMessageSpy).toHaveBeenCalledWith({ type: "zooGatewayCredentialsReady" })
 				expect(upsertSpy).toHaveBeenCalledWith(
 					"Zoo Gateway",
 					expect.objectContaining({
@@ -3809,6 +4521,7 @@ describe("ClineProvider - Comprehensive Edit/Delete Edge Cases", () => {
 				const { getCachedZooCodeToken } = await import("../../../services/zoo-code-auth")
 				vi.mocked(getCachedZooCodeToken).mockReturnValue("current-token")
 				const handleSpy = vi.spyOn(provider, "handleZooCodeCallback").mockResolvedValue(undefined)
+				const postMessageSpy = vi.spyOn(provider, "postMessageToWebview").mockResolvedValue(undefined)
 
 				;(provider as any).providerSettingsManager = {
 					listConfig: vi.fn().mockResolvedValue([{ name: "Zoo Gateway", apiProvider: "zoo-gateway" }]),
@@ -3821,6 +4534,7 @@ describe("ClineProvider - Comprehensive Edit/Delete Edge Cases", () => {
 				await (provider as any).ensureZooGatewayProfileSeeded()
 
 				expect(handleSpy).not.toHaveBeenCalled()
+				expect(postMessageSpy).toHaveBeenCalledWith({ type: "zooGatewayCredentialsReady" })
 			})
 
 			it("re-seeds when any zoo-gateway profile has a stale or missing token", async () => {

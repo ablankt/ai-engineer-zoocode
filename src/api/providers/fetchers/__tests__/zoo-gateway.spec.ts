@@ -6,9 +6,15 @@ import { getZooGatewayModels, parseZooGatewayModel } from "../zoo-gateway"
 
 vitest.mock("axios")
 vitest.mock("../../../../services/zoo-code-auth", () => ({
-	getCachedZooCodeToken: vitest.fn(() => ""),
-	getZooCodeBaseUrl: vitest.fn(() => "https://example.test"),
-	resolveZooGatewaySessionToken: vitest.fn((profileToken?: string) => profileToken || undefined),
+	getCachedZooCodeToken: vitest.fn(function () {
+		return ""
+	}),
+	getZooCodeBaseUrl: vitest.fn(function () {
+		return "https://example.test"
+	}),
+	resolveZooGatewaySessionToken: vitest.fn(function (profileToken?: string) {
+		return profileToken || undefined
+	}),
 }))
 const mockedAxios = axios as any
 
@@ -77,17 +83,15 @@ describe("Zoo Gateway Fetchers", () => {
 			expect(models["anthropic/claude-sonnet-4"]).toBeDefined()
 		})
 
-		it("omits the Authorization header when no token is provided", async () => {
-			mockedAxios.get.mockResolvedValueOnce(mockResponse)
+		it("skips the request and returns {} when no token is available", async () => {
+			const models = await getZooGatewayModels({ zooGatewayBaseUrl: baseUrl } as any)
 
-			await getZooGatewayModels({ zooGatewayBaseUrl: baseUrl } as any)
-
-			const call = mockedAxios.get.mock.calls[0]
-			expect(call[1].headers.Authorization).toBeUndefined()
+			expect(mockedAxios.get).not.toHaveBeenCalled()
+			expect(models).toEqual({})
 		})
 
 		it("returns {} and never leaks the error object when the request fails", async () => {
-			const consoleErrorSpy = vitest.spyOn(console, "error").mockImplementation(() => {})
+			const consoleErrorSpy = vitest.spyOn(console, "error").mockImplementation(function () {})
 			const failure: any = new Error("Network error")
 			// Simulate axios attaching the request config (which contains the bearer token).
 			failure.config = { headers: { Authorization: "Bearer should-never-be-logged" } }
@@ -140,7 +144,7 @@ describe("Zoo Gateway Fetchers", () => {
 			expect(models["anthropic/claude-sonnet-4"].description).toBe("Claude Sonnet 4")
 		})
 		it("returns {} on a structurally broken response instead of throwing", async () => {
-			const consoleErrorSpy = vitest.spyOn(console, "error").mockImplementation(() => {})
+			const consoleErrorSpy = vitest.spyOn(console, "error").mockImplementation(function () {})
 			mockedAxios.get.mockResolvedValueOnce({ data: { unexpected: true } })
 
 			const models = await getZooGatewayModels({
@@ -155,6 +159,28 @@ describe("Zoo Gateway Fetchers", () => {
 	})
 
 	describe("parseZooGatewayModel", () => {
+		it("enables image attachment from Zoo Gateway vision tags", () => {
+			const result = parseZooGatewayModel({
+				id: "anthropic/claude-sonnet-4.5",
+				model: {
+					id: "anthropic/claude-sonnet-4.5",
+					object: "model",
+					owned_by: "anthropic",
+					name: "Claude Sonnet 4.5",
+					context_window: 200000,
+					max_tokens: 64000,
+					type: "language",
+					tags: ["tool-use", "vision"],
+					pricing: {
+						input: "3.00",
+						output: "15.00",
+					},
+				},
+			})
+
+			expect(result.supportsImages).toBe(true)
+		})
+
 		it("delegates to the vercel-ai-gateway parser", () => {
 			const result = parseZooGatewayModel({
 				id: "anthropic/claude-sonnet-4",

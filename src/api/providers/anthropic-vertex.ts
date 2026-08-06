@@ -25,7 +25,7 @@ import {
 
 import { BaseProvider } from "./base-provider"
 import { parseVertexJsonCredentials } from "./utils/vertex-credentials"
-import type { SingleCompletionHandler, ApiHandlerCreateMessageMetadata } from "../index"
+import type { SingleCompletionHandler, ApiHandlerCreateMessageMetadata, CompletePromptOptions } from "../index"
 
 // https://docs.anthropic.com/en/api/claude-on-vertex-ai
 export class AnthropicVertexHandler extends BaseProvider implements SingleCompletionHandler {
@@ -51,6 +51,7 @@ export class AnthropicVertexHandler extends BaseProvider implements SingleComple
 					scopes: ["https://www.googleapis.com/auth/cloud-platform"],
 					credentials: parsedVertexCredentials,
 				}),
+				timeout: this.timeoutMs,
 			})
 		} else if (this.options.vertexKeyFile) {
 			this.client = new AnthropicVertex({
@@ -60,9 +61,10 @@ export class AnthropicVertexHandler extends BaseProvider implements SingleComple
 					scopes: ["https://www.googleapis.com/auth/cloud-platform"],
 					keyFile: this.options.vertexKeyFile,
 				}),
+				timeout: this.timeoutMs,
 			})
 		} else {
-			this.client = new AnthropicVertex({ projectId, region })
+			this.client = new AnthropicVertex({ projectId, region, timeout: this.timeoutMs })
 		}
 	}
 
@@ -71,7 +73,7 @@ export class AnthropicVertexHandler extends BaseProvider implements SingleComple
 		messages: Anthropic.Messages.MessageParam[],
 		metadata?: ApiHandlerCreateMessageMetadata,
 	): ApiStream {
-		let { id, info, temperature, maxTokens, reasoning: thinking, betas } = this.getModel()
+		const { id, info, temperature, maxTokens, reasoning: thinking, betas } = this.getModel()
 
 		const { supportsPromptCache } = info
 
@@ -210,7 +212,7 @@ export class AnthropicVertexHandler extends BaseProvider implements SingleComple
 
 	getModel() {
 		const modelId = this.options.apiModelId
-		let id = modelId && modelId in vertexModels ? (modelId as VertexModelId) : vertexDefaultModelId
+		const id = modelId && modelId in vertexModels ? (modelId as VertexModelId) : vertexDefaultModelId
 		let info: ModelInfo = vertexModels[id]
 
 		// Check if 1M context beta should be enabled for supported models
@@ -268,9 +270,9 @@ export class AnthropicVertexHandler extends BaseProvider implements SingleComple
 		}
 	}
 
-	async completePrompt(prompt: string) {
+	async completePrompt(prompt: string, options?: CompletePromptOptions) {
 		try {
-			let {
+			const {
 				id,
 				info: { supportsPromptCache },
 				temperature,
@@ -295,13 +297,9 @@ export class AnthropicVertexHandler extends BaseProvider implements SingleComple
 			} as Anthropic.Messages.MessageCreateParamsNonStreaming
 
 			const response = await this.client.messages.create(params)
-			const content = response.content[0]
+			const content = response.content.find(({ type }) => type === "text")
 
-			if (content.type === "text") {
-				return content.text
-			}
-
-			return ""
+			return content?.type === "text" ? content.text : ""
 		} catch (error) {
 			if (error instanceof Error) {
 				throw new Error(`Vertex completion error: ${error.message}`)

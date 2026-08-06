@@ -1,16 +1,14 @@
 import * as vscode from "vscode"
-import * as dotenvx from "@dotenvx/dotenvx"
+import * as dotenv from "dotenv"
 import * as fs from "fs"
 import * as path from "path"
 
 // Load environment variables from .env file
 // The extension-level .env is optional (not shipped in production builds).
-// Avoid calling dotenvx when the file doesn't exist, otherwise dotenvx emits
-// a noisy [MISSING_ENV_FILE] error to the extension host console.
 const envPath = path.join(__dirname, "..", ".env")
 if (fs.existsSync(envPath)) {
 	try {
-		dotenvx.config({ path: envPath })
+		dotenv.config({ path: envPath })
 	} catch (e) {
 		// Best-effort only: never fail extension activation due to optional env loading.
 		console.warn("Failed to load environment variables:", e)
@@ -34,6 +32,7 @@ import { DIFF_VIEW_URI_SCHEME } from "./integrations/editor/DiffViewProvider"
 import { Terminal } from "./integrations/terminal/Terminal"
 import { TerminalRegistry } from "./integrations/terminal/TerminalRegistry"
 import { openAiCodexOAuthManager } from "./integrations/openai-codex/oauth"
+import { kimiCodeOAuthManager } from "./integrations/kimi-code/oauth"
 import { McpServerManager } from "./services/mcp/McpServerManager"
 import { CodeIndexManager } from "./services/code-index/manager"
 import { MdmService } from "./services/mdm/MdmService"
@@ -166,6 +165,8 @@ export async function activate(context: vscode.ExtensionContext) {
 
 	// Initialize OpenAI Codex OAuth manager for ChatGPT subscription-based access.
 	openAiCodexOAuthManager.initialize(context, (message) => outputChannel.appendLine(message))
+	// Kimi Code OAuth tokens live only in VS Code SecretStorage, outside provider profile JSON/cloud sync.
+	kimiCodeOAuthManager.initialize(context)
 
 	// Initialize Zoo Code auth service for extension session token management.
 	await initZooCodeAuth(context)
@@ -368,91 +369,93 @@ export async function activate(context: vscode.ExtensionContext) {
 	// FOR AIE : Auto update mechanism
 	// TODO: Update URL to Zoo Code once it's been deployed on plugin proxy
 	// Uncomment once plugin proxy is ready
-	// const infoURL = "https://plugins.dev.aie.ai.t-systems.net/v1/registry/434185/packages/latest/info"
-	// const downloadURL = "https://plugins.dev.aie.ai.t-systems.net/v1/registry/434185/packages/latest/download"
+	const infoURL = "https://plugins.ai.t-systems.net/v1/registry/497248/packages/latest/info"
+	const downloadURL = "https://plugins.ai.t-systems.net/v1/registry/497248/packages/latest/download"
 
-	// nodeFetch(infoURL)
-	// 	//@ts-ignore
-	// 	.then(async (manifest_response) => {
-	// 		const manifest_json: any = await manifest_response.json()
+	nodeFetch(infoURL)
+		//@ts-ignore
+		.then(async (manifest_response) => {
+			const manifest_json: any = await manifest_response.json()
 
-	// 		const downloadVersionRaw = manifest_json.package_version
-	// 		//Regex to extract version-number to compare with package.json version, it just filters out the -aie suffix from version
-	// 		const versionMatch = downloadVersionRaw.match(/^\d+\.\d+\.\d+(?:-\d+)?/)
-	// 		const DOWNLOAD_VERSION = versionMatch ? versionMatch[0] : null
+			const downloadVersionRaw = manifest_json.package_version
+			//Regex to extract version-number to compare with package.json version, it just filters out the -aie suffix from version
+			const versionMatch = downloadVersionRaw.match(/^\d+\.\d+\.\d+(?:-\d+)?/)
+			const DOWNLOAD_VERSION = versionMatch ? versionMatch[0] : null
 
-	// 		if (!DOWNLOAD_VERSION) {
-	// 			throw new Error(
-	// 				"Download version on AIFS plugin proxy for Zoo Code is incorrectly formatted, try again!",
-	// 			)
-	// 		}
+			if (!DOWNLOAD_VERSION) {
+				throw new Error(
+					"Download version on AIFS plugin proxy for Zoo Code is incorrectly formatted, try again!",
+				)
+			}
 
-	// 		if (isNewerVersion(DOWNLOAD_VERSION, APP_VERSION)) {
-	// 			const filename = `zoo-code-${DOWNLOAD_VERSION}.vsix`
-	// 			const vsixPath: string = path.join(__dirname, filename)
-	// 			console.log("Zoo Code vsixPath: ", vsixPath)
+			if (isNewerVersion(DOWNLOAD_VERSION, APP_VERSION)) {
+				const filename = `zoo-code-${DOWNLOAD_VERSION}.vsix`
+				const vsixPath: string = path.join(__dirname, filename)
+				console.log("Zoo Code vsixPath: ", vsixPath)
 
-	// 			vscode.window
-	// 				.showInformationMessage(
-	// 					`Zoo Code version ${DOWNLOAD_VERSION} is available. Do you want to update now?`,
-	// 					"Yes",
-	// 					"Later",
-	// 				)
-	// 				.then((choice) => {
-	// 					if (choice === "Yes") {
-	// 						nodeFetch(downloadURL)
-	// 							//@ts-ignore
-	// 							.then(async (response) => {
-	// 								if (response.status == 200) {
-	// 									const fileStream = fs.createWriteStream(vsixPath)
-	// 									//@ts-ignore
-	// 									response.body.pipe(fileStream)
+				vscode.window
+					.showInformationMessage(
+						`Zoo Code version ${DOWNLOAD_VERSION} is available. Do you want to update now?`,
+						"Yes",
+						"Later",
+					)
+					.then((choice) => {
+						if (choice === "Yes") {
+							nodeFetch(downloadURL)
+								//@ts-ignore
+								.then(async (response) => {
+									if (response.status == 200) {
+										const fileStream = fs.createWriteStream(vsixPath)
+										//@ts-ignore
+										response.body.pipe(fileStream)
 
-	// 									return new Promise((resolve, reject) => {
-	// 										//@ts-ignore
-	// 										response.body.on("error", reject)
-	// 										fileStream.on("finish", () => resolve(vsixPath))
-	// 									})
-	// 								} else {
-	// 									let err = await response.json()
-	// 									console.log("Writing file failed for Zoo code: ", err)
-	// 									throw "response body error Zoo Code write: " + err
-	// 								}
-	// 							})
-	// 							.then(() => {
-	// 								//@ts-ignore
-	// 								vscode.commands.executeCommand(
-	// 									"workbench.extensions.installExtension",
-	// 									vscode.Uri.file(vsixPath),
-	// 								)
-	// 								vscode.window.showInformationMessage("Zoo Code extension updated successfully.")
+										return new Promise((resolve, reject) => {
+											//@ts-ignore
+											response.body.on("error", reject)
+											fileStream.on("finish", () => resolve(vsixPath))
+										})
+									} else {
+										let err = await response.json()
+										console.log("Writing file failed for Zoo code: ", err)
+										throw "response body error Zoo Code write: " + err
+									}
+								})
+								.then(() => {
+									//@ts-ignore
+									vscode.commands.executeCommand(
+										"workbench.extensions.installExtension",
+										vscode.Uri.file(vsixPath),
+									)
+									vscode.window.showInformationMessage("Zoo Code extension updated successfully.")
 
-	// 								vscode.window
-	// 									.showInformationMessage(
-	// 										"Zoo Code extension updated successfully. Restart to apply changes?",
-	// 										"Restart Now",
-	// 										"Later",
-	// 									)
-	// 									.then((choice) => {
-	// 										//@ts-ignore
-	// 										if (choice === "Restart Now") {
-	// 											vscode.commands.executeCommand("workbench.action.restartExtensions")
-	// 										}
-	// 									})
-	// 							})
-	// 							.catch((error: any) => {
-	// 								vscode.window.showErrorMessage("Failed to download or install the update. for Zoo Code" + error)
-	// 							})
-	// 					}
-	// 				})
-	// 		} else {
-	// 			console.log("Current version of Zoo Code is greater than or equal to version to download!")
-	// 		}
-	// 	})
-	// 	.catch((error: any) => {
-	// 		// Show error to the user
-	// 		vscode.window.showErrorMessage("Failed to check for Zoo Code update: " + error.message)
-	// 	})
+									vscode.window
+										.showInformationMessage(
+											"Zoo Code extension updated successfully. Restart to apply changes?",
+											"Restart Now",
+											"Later",
+										)
+										.then((choice) => {
+											//@ts-ignore
+											if (choice === "Restart Now") {
+												vscode.commands.executeCommand("workbench.action.restartExtensions")
+											}
+										})
+								})
+								.catch((error: any) => {
+									vscode.window.showErrorMessage(
+										"Failed to download or install the update. for Zoo Code" + error,
+									)
+								})
+						}
+					})
+			} else {
+				console.log("Current version of Zoo Code is greater than or equal to version to download!")
+			}
+		})
+		.catch((error: any) => {
+			// Show error to the user
+			vscode.window.showErrorMessage("Failed to check for Zoo Code update: " + error.message)
+		})
 
 	return new API(outputChannel, provider, socketPath, enableLogging)
 }

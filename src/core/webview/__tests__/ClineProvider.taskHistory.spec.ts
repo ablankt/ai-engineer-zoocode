@@ -2,6 +2,7 @@
 
 import * as vscode from "vscode"
 import type { HistoryItem, ExtensionMessage } from "@roo-code/types"
+import { RooCodeEventName } from "@roo-code/types"
 import { TelemetryService } from "@roo-code/telemetry"
 
 import { ContextProxy } from "../../config/ContextProxy"
@@ -47,7 +48,9 @@ vi.mock("../../../utils/storage", () => ({
 	getSettingsDirectoryPath: vi.fn().mockResolvedValue("/test/settings/path"),
 	getTaskDirectoryPath: vi.fn().mockResolvedValue("/test/task/path"),
 	getGlobalStoragePath: vi.fn().mockResolvedValue("/test/storage/path"),
-	getStorageBasePath: vi.fn().mockImplementation((defaultPath: string) => defaultPath),
+	getStorageBasePath: vi.fn().mockImplementation((defaultPath: string) => {
+		return defaultPath
+	}),
 }))
 
 vi.mock("../../../utils/safeWriteJson", () => ({
@@ -76,19 +79,23 @@ vi.mock("@modelcontextprotocol/sdk/types.js", () => ({
 }))
 
 vi.mock("@modelcontextprotocol/sdk/client/index.js", () => ({
-	Client: vi.fn().mockImplementation(() => ({
-		connect: vi.fn().mockResolvedValue(undefined),
-		close: vi.fn().mockResolvedValue(undefined),
-		listTools: vi.fn().mockResolvedValue({ tools: [] }),
-		callTool: vi.fn().mockResolvedValue({ content: [] }),
-	})),
+	Client: vi.fn().mockImplementation(function () {
+		return {
+			connect: vi.fn().mockResolvedValue(undefined),
+			close: vi.fn().mockResolvedValue(undefined),
+			listTools: vi.fn().mockResolvedValue({ tools: [] }),
+			callTool: vi.fn().mockResolvedValue({ content: [] }),
+		}
+	}),
 }))
 
 vi.mock("@modelcontextprotocol/sdk/client/stdio.js", () => ({
-	StdioClientTransport: vi.fn().mockImplementation(() => ({
-		connect: vi.fn().mockResolvedValue(undefined),
-		close: vi.fn().mockResolvedValue(undefined),
-	})),
+	StdioClientTransport: vi.fn().mockImplementation(function () {
+		return {
+			connect: vi.fn().mockResolvedValue(undefined),
+			close: vi.fn().mockResolvedValue(undefined),
+		}
+	}),
 }))
 
 vi.mock("vscode", () => ({
@@ -117,9 +124,11 @@ vi.mock("vscode", () => ({
 			get: vi.fn().mockReturnValue([]),
 			update: vi.fn(),
 		}),
-		onDidChangeConfiguration: vi.fn().mockImplementation(() => ({
-			dispose: vi.fn(),
-		})),
+		onDidChangeConfiguration: vi.fn().mockImplementation(() => {
+			return {
+				dispose: vi.fn(),
+			}
+		}),
 		onDidSaveTextDocument: vi.fn(() => ({ dispose: vi.fn() })),
 		onDidChangeTextDocument: vi.fn(() => ({ dispose: vi.fn() })),
 		onDidOpenTextDocument: vi.fn(() => ({ dispose: vi.fn() })),
@@ -158,29 +167,33 @@ vi.mock("../../prompts/system", () => ({
 
 vi.mock("../../../integrations/workspace/WorkspaceTracker", () => {
 	return {
-		default: vi.fn().mockImplementation(() => ({
-			initializeFilePaths: vi.fn(),
-			dispose: vi.fn(),
-		})),
+		default: vi.fn().mockImplementation(function () {
+			return {
+				initializeFilePaths: vi.fn(),
+				dispose: vi.fn(),
+			}
+		}),
 	}
 })
 
 vi.mock("../../task/Task", () => ({
-	Task: vi.fn().mockImplementation((options: any) => ({
-		api: undefined,
-		abortTask: vi.fn(),
-		handleWebviewAskResponse: vi.fn(),
-		clineMessages: [],
-		apiConversationHistory: [],
-		overwriteClineMessages: vi.fn(),
-		overwriteApiConversationHistory: vi.fn(),
-		getTaskNumber: vi.fn().mockReturnValue(0),
-		setTaskNumber: vi.fn(),
-		setParentTask: vi.fn(),
-		setRootTask: vi.fn(),
-		taskId: options?.historyItem?.id || "test-task-id",
-		emit: vi.fn(),
-	})),
+	Task: vi.fn().mockImplementation(function (options: any) {
+		return {
+			api: undefined,
+			abortTask: vi.fn(),
+			handleWebviewAskResponse: vi.fn(),
+			clineMessages: [],
+			apiConversationHistory: [],
+			overwriteClineMessages: vi.fn(),
+			overwriteApiConversationHistory: vi.fn(),
+			getTaskNumber: vi.fn().mockReturnValue(0),
+			setTaskNumber: vi.fn(),
+			setParentTask: vi.fn(),
+			setRootTask: vi.fn(),
+			taskId: options?.historyItem?.id || "test-task-id",
+			emit: vi.fn(),
+		}
+	}),
 }))
 
 vi.mock("../../../integrations/misc/extract-text", () => ({
@@ -206,10 +219,12 @@ vi.mock("../../../shared/modes", () => ({
 }))
 
 vi.mock("../diff/strategies/multi-search-replace", () => ({
-	MultiSearchReplaceDiffStrategy: vi.fn().mockImplementation(() => ({
-		getName: () => "test-strategy",
-		applyDiff: vi.fn(),
-	})),
+	MultiSearchReplaceDiffStrategy: vi.fn().mockImplementation(function () {
+		return {
+			getName: () => "test-strategy",
+			applyDiff: vi.fn(),
+		}
+	}),
 }))
 
 vi.mock("@roo-code/cloud", () => ({
@@ -266,19 +281,29 @@ describe("ClineProvider Task History Synchronization", () => {
 			extensionPath: "/test/path",
 			extensionUri: { fsPath: "/test/path" } as vscode.Uri,
 			globalState: {
-				get: vi.fn().mockImplementation((key: string) => globalState[key]),
+				get: vi.fn().mockImplementation((key: string) => {
+					return globalState[key]
+				}),
 				update: vi.fn().mockImplementation((key: string, value: any) => {
 					globalState[key] = value
 					if (key === "taskHistory") {
 						taskHistoryState = value
 					}
 				}),
-				keys: vi.fn().mockImplementation(() => Object.keys(globalState)),
+				keys: vi.fn().mockImplementation(() => {
+					return Object.keys(globalState)
+				}),
 			},
 			secrets: {
-				get: vi.fn().mockImplementation((key: string) => secrets[key]),
-				store: vi.fn().mockImplementation((key: string, value: string | undefined) => (secrets[key] = value)),
-				delete: vi.fn().mockImplementation((key: string) => delete secrets[key]),
+				get: vi.fn().mockImplementation((key: string) => {
+					return secrets[key]
+				}),
+				store: vi.fn().mockImplementation((key: string, value: string | undefined) => {
+					return (secrets[key] = value)
+				}),
+				delete: vi.fn().mockImplementation((key: string) => {
+					return delete secrets[key]
+				}),
 			},
 			workspaceState: {
 				get: vi.fn().mockReturnValue(undefined),
@@ -316,7 +341,9 @@ describe("ClineProvider Task History Synchronization", () => {
 				callback()
 				return { dispose: vi.fn() }
 			}),
-			onDidChangeVisibility: vi.fn().mockImplementation(() => ({ dispose: vi.fn() })),
+			onDidChangeVisibility: vi.fn().mockImplementation(() => {
+				return { dispose: vi.fn() }
+			}),
 		} as unknown as vscode.WebviewView
 
 		provider = new ClineProvider(mockContext, mockOutputChannel, "sidebar", new ContextProxy(mockContext))
@@ -752,6 +779,72 @@ describe("ClineProvider Task History Synchronization", () => {
 			expect(item).toBeDefined()
 			// The second write (tokensIn: 222) should be the last one since writes are serialized
 			expect(item!.tokensIn).toBe(222)
+		})
+	})
+
+	describe("taskCreationCallback — onTaskCompleted listener", () => {
+		function makeFakeTask(taskId: string) {
+			const listeners: Record<string, ((...args: unknown[]) => unknown)[]> = {}
+			return {
+				taskId,
+				on: (event: string, fn: (...args: unknown[]) => unknown) => {
+					listeners[event] = listeners[event] ?? []
+					listeners[event].push(fn)
+				},
+				// Returns a promise that resolves when all async listeners have settled.
+				emit: async (event: string, ...args: unknown[]) => {
+					await Promise.all((listeners[event] ?? []).map((fn) => Promise.resolve(fn(...args))))
+				},
+			}
+		}
+
+		it("writes completed status when task is not already completed", async () => {
+			const existing = createHistoryItem({ id: "task-cb-1", task: "T" })
+			await provider.updateTaskHistory(existing, { broadcast: false })
+
+			const fakeTask = makeFakeTask("task-cb-1")
+			;(provider as any).taskCreationCallback(fakeTask)
+
+			await fakeTask.emit(RooCodeEventName.TaskCompleted, "task-cb-1", {}, {})
+
+			const stored = provider.taskHistoryStore.get("task-cb-1")
+			expect(stored?.status).toBe("completed")
+		})
+
+		it("skips the write when task is already completed", async () => {
+			const existing = createHistoryItem({ id: "task-cb-2", task: "T", status: "completed" })
+			await provider.updateTaskHistory(existing, { broadcast: false })
+
+			const updateSpy = vi.spyOn(provider, "updateTaskHistory")
+
+			const fakeTask = makeFakeTask("task-cb-2")
+			;(provider as any).taskCreationCallback(fakeTask)
+
+			await fakeTask.emit(RooCodeEventName.TaskCompleted, "task-cb-2", {}, {})
+
+			// updateTaskHistory is called initially to store the item, but should NOT be
+			// called again by onTaskCompleted since it's already completed.
+			const onTaskCompletedCalls = updateSpy.mock.calls.filter((c) => {
+				const item = c[0] as HistoryItem
+				return item?.id === "task-cb-2" && item?.status === "completed"
+			})
+			// It was written with completed status already; the callback must not re-write.
+			expect(onTaskCompletedCalls.length).toBe(0)
+		})
+
+		it("logs and does not throw when updateTaskHistory rejects", async () => {
+			const existing = createHistoryItem({ id: "task-cb-3", task: "T" })
+			await provider.updateTaskHistory(existing, { broadcast: false })
+
+			vi.spyOn(provider, "updateTaskHistory").mockRejectedValueOnce(new Error("disk full"))
+			const logSpy = vi.spyOn(provider as any, "log")
+
+			const fakeTask = makeFakeTask("task-cb-3")
+			;(provider as any).taskCreationCallback(fakeTask)
+
+			await fakeTask.emit(RooCodeEventName.TaskCompleted, "task-cb-3", {}, {})
+
+			expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("[onTaskCompleted] Failed to write"))
 		})
 	})
 })

@@ -1,6 +1,18 @@
 // pnpm --filter roo-cline test api/providers/__tests__/openrouter.spec.ts
 
-vitest.mock("vscode", () => ({}))
+vitest.mock("vscode", () => ({
+	workspace: {
+		getConfiguration: () => ({
+			get: (_key: string, defaultValue?: unknown) => defaultValue,
+		}),
+	},
+}))
+
+vitest.mock("../utils/timeout-config", () => ({
+	getApiRequestTimeout: vitest.fn().mockReturnValue(300_000),
+}))
+
+const MOCK_TIMEOUT_MS = 300_000
 
 import { Anthropic } from "@anthropic-ai/sdk"
 import OpenAI from "openai"
@@ -10,7 +22,11 @@ import { ApiHandlerOptions } from "../../../shared/api"
 import { Package } from "../../../shared/package"
 
 vitest.mock("openai")
-vitest.mock("delay", () => ({ default: vitest.fn(() => Promise.resolve()) }))
+vitest.mock("delay", () => ({
+	default: vitest.fn(function () {
+		return Promise.resolve()
+	}),
+}))
 
 const mockCaptureException = vitest.fn()
 
@@ -23,7 +39,7 @@ vitest.mock("@roo-code/telemetry", () => ({
 }))
 
 vitest.mock("../fetchers/modelCache", () => ({
-	getModels: vitest.fn().mockImplementation(() => {
+	getModels: vitest.fn().mockImplementation(function () {
 		return Promise.resolve({
 			"anthropic/claude-sonnet-4": {
 				maxTokens: 8192,
@@ -104,6 +120,7 @@ describe("OpenRouterHandler", () => {
 				"X-Title": "Zoo Code",
 				"User-Agent": `ZooCode/${Package.version}`,
 			},
+			timeout: MOCK_TIMEOUT_MS,
 		})
 	})
 

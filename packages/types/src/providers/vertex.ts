@@ -6,6 +6,19 @@ export type VertexModelId = keyof typeof vertexModels
 export const vertexDefaultModelId: VertexModelId = "claude-sonnet-4-5@20250929"
 
 export const vertexModels = {
+	"gemini-3.6-flash": {
+		maxTokens: 65_536,
+		contextWindow: 1_048_576,
+		supportsImages: true,
+		supportsPromptCache: true,
+		supportsReasoningEffort: ["minimal", "low", "medium", "high"],
+		reasoningEffort: "medium",
+		inputPrice: 1.5,
+		outputPrice: 7.5,
+		cacheReadsPrice: 0.15,
+		cacheWritesPrice: 1.0,
+		supportsReasoningBudget: false,
+	},
 	"gemini-3.5-flash": {
 		maxTokens: 65_536,
 		contextWindow: 1_048_576,
@@ -355,6 +368,21 @@ export const vertexModels = {
 			},
 		],
 	},
+	"claude-sonnet-5": {
+		maxTokens: 8192,
+		contextWindow: 1_000_000, // 1M context window native (no beta header required)
+		supportsImages: true,
+		supportsPromptCache: true,
+		inputPrice: 2.0, // $2 per million input tokens (introductory pricing through Aug 31, 2026)
+		outputPrice: 10.0, // $10 per million output tokens (introductory pricing through Aug 31, 2026)
+		cacheWritesPrice: 2.5, // $2.50 per million tokens (introductory pricing through Aug 31, 2026)
+		cacheReadsPrice: 0.2, // $0.20 per million tokens (introductory pricing through Aug 31, 2026)
+		supportsReasoningBudget: true,
+		supportsReasoningBinary: true,
+		supportsTemperature: false,
+		description:
+			"Claude Sonnet 5 is the best combination of speed and intelligence, optimized for coding, tool use, and agentic workflows.",
+	},
 	"claude-haiku-4-5@20251001": {
 		maxTokens: 8192,
 		contextWindow: 200_000,
@@ -433,6 +461,35 @@ export const vertexModels = {
 				cacheReadsPrice: 1.0, // $1.00 per million tokens (>200K context)
 			},
 		],
+	},
+	"claude-opus-5": {
+		maxTokens: 8192,
+		contextWindow: 1_000_000, // 1M context window native (no beta header required)
+		supportsImages: true,
+		supportsPromptCache: true,
+		inputPrice: 5.0, // $5 per million input tokens
+		outputPrice: 25.0, // $25 per million output tokens
+		cacheWritesPrice: 6.25, // $6.25 per million tokens
+		cacheReadsPrice: 0.5, // $0.50 per million tokens
+		supportsReasoningBudget: true,
+		supportsReasoningBinary: true,
+		supportsTemperature: false,
+		description: "Claude Opus 5 is Anthropic's most capable model for complex agentic coding and enterprise work.",
+	},
+	"claude-fable-5": {
+		maxTokens: 8192,
+		contextWindow: 1_000_000,
+		supportsImages: true,
+		supportsPromptCache: true,
+		inputPrice: 10.0,
+		outputPrice: 50.0,
+		cacheWritesPrice: 12.5,
+		cacheReadsPrice: 1.0,
+		supportsReasoningBudget: true,
+		supportsReasoningBinary: true,
+		supportsTemperature: false,
+		description:
+			"Claude Fable 5 is Anthropic's most capable widely released model for the most demanding reasoning and long-horizon agentic work.",
 	},
 	"claude-opus-4-5@20251101": {
 		maxTokens: 8192,

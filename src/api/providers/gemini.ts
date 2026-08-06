@@ -23,7 +23,7 @@ import { t } from "i18next"
 import type { ApiStream, GroundingSource } from "../transform/stream"
 import { getModelParams } from "../transform/model-params"
 
-import type { SingleCompletionHandler, ApiHandlerCreateMessageMetadata } from "../index"
+import type { SingleCompletionHandler, ApiHandlerCreateMessageMetadata, CompletePromptOptions } from "../index"
 import { BaseProvider } from "./base-provider"
 import { parseVertexJsonCredentials } from "./utils/vertex-credentials"
 
@@ -576,7 +576,7 @@ export class GeminiHandler extends BaseProvider implements SingleCompletionHandl
 		return citationLinks.join(", ")
 	}
 
-	async completePrompt(prompt: string): Promise<string> {
+	async completePrompt(prompt: string, options?: CompletePromptOptions): Promise<string> {
 		const { id: model, info } = this.getModel()
 
 		try {
@@ -678,7 +678,7 @@ export class GeminiHandler extends BaseProvider implements SingleCompletionHandl
 		// Bill both completion and reasoning ("thoughts") tokens as output.
 		const billedOutputTokens = outputTokens + reasoningTokens
 
-		let cacheReadCost = cacheReadTokens > 0 ? cacheReadsPrice * (cacheReadTokens / 1_000_000) : 0
+		const cacheReadCost = cacheReadTokens > 0 ? cacheReadsPrice * (cacheReadTokens / 1_000_000) : 0
 
 		const inputTokensCost = inputPrice * (uncachedInputTokens / 1_000_000)
 		const outputTokensCost = outputPrice * (billedOutputTokens / 1_000_000)

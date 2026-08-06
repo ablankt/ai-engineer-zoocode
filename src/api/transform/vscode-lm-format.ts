@@ -4,7 +4,7 @@ import * as vscode from "vscode"
 /**
  * Safely converts a value into a plain object.
  */
-function asObjectSafe(value: any): object {
+function asObjectSafe(value: unknown): object {
 	// Handle null/undefined
 	if (!value) {
 		return {}
@@ -23,7 +23,7 @@ function asObjectSafe(value: any): object {
 
 		return {}
 	} catch (error) {
-		console.warn("Roo Code <Language Model API>: Failed to parse object:", error)
+		console.warn("Zoo Code <Language Model API>: Failed to parse object:", error)
 		return {}
 	}
 }
@@ -72,11 +72,19 @@ export function convertToVsCodeLmMessages(
 								? [new vscode.LanguageModelTextPart(toolMessage.content)]
 								: (toolMessage.content?.map((part) => {
 										if (part.type === "image") {
+											if (part.source.type === "base64") {
+												return new vscode.LanguageModelTextPart(
+													`[Image (base64): ${part.source.media_type} not supported by VSCode LM API]`,
+												)
+											}
 											return new vscode.LanguageModelTextPart(
-												`[Image (${part.source?.type || "Unknown source-type"}): ${part.source?.media_type || "unknown media-type"} not supported by VSCode LM API]`,
+												`[Image (${part.source.type}): not supported by VSCode LM API]`,
 											)
 										}
-										return new vscode.LanguageModelTextPart(part.text)
+										if (part.type === "text") {
+											return new vscode.LanguageModelTextPart(part.text)
+										}
+										return new vscode.LanguageModelTextPart("")
 									}) ?? [new vscode.LanguageModelTextPart("")])
 
 						return new vscode.LanguageModelToolResultPart(toolMessage.tool_use_id, toolContentParts)
@@ -85,8 +93,13 @@ export function convertToVsCodeLmMessages(
 					// Convert non-tool messages to TextParts after tool messages
 					...nonToolMessages.map((part) => {
 						if (part.type === "image") {
+							if (part.source.type === "base64") {
+								return new vscode.LanguageModelTextPart(
+									`[Image (base64): ${part.source.media_type} not supported by VSCode LM API]`,
+								)
+							}
 							return new vscode.LanguageModelTextPart(
-								`[Image (${part.source?.type || "Unknown source-type"}): ${part.source?.media_type || "unknown media-type"} not supported by VSCode LM API]`,
+								`[Image (${part.source.type}): not supported by VSCode LM API]`,
 							)
 						}
 						return new vscode.LanguageModelTextPart(part.text)
@@ -184,7 +197,7 @@ export function extractTextCountFromMessage(message: vscode.LanguageModelChatMes
 					try {
 						text += JSON.stringify(item.input)
 					} catch (error) {
-						console.error("Roo Code <Language Model API>: Failed to stringify tool call input:", error)
+						console.error("Zoo Code <Language Model API>: Failed to stringify tool call input:", error)
 					}
 				}
 			}

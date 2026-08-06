@@ -1,17 +1,24 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react"
-import { vi, describe, it, expect, beforeEach } from "vitest"
+import { act, render, screen, fireEvent, waitFor, configure } from "@testing-library/react"
+import { vi, describe, it, expect, beforeEach, beforeAll } from "vitest"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import React from "react"
 
+// Increase timeout for slow CI environments
+configure({ asyncUtilTimeout: 10000 })
+
 // Mock vscode API
-const mockPostMessage = vi.fn()
+const mockPostMessage = vi.hoisted(() => vi.fn())
 const mockVscode = {
 	postMessage: mockPostMessage,
 }
 ;(global as any).acquireVsCodeApi = () => mockVscode
 
-// Import the actual component
-import SettingsView from "../SettingsView"
+vi.mock("@src/utils/vscode", () => ({
+	vscode: {
+		postMessage: mockPostMessage,
+	},
+}))
+
 import { useExtensionState } from "@src/context/ExtensionStateContext"
 
 // Mock the extension state context
@@ -19,10 +26,12 @@ vi.mock("@src/context/ExtensionStateContext", () => ({
 	useExtensionState: vi.fn(),
 }))
 
+const mockTranslate = vi.hoisted(() => (key: string) => key)
+
 // Mock the translation context
 vi.mock("@src/i18n/TranslationContext", () => ({
 	useAppTranslation: () => ({
-		t: (key: string) => key,
+		t: mockTranslate,
 	}),
 }))
 
@@ -85,6 +94,18 @@ vi.mock("@src/components/ui", () => ({
 	TooltipProvider: ({ children }: any) => <>{children}</>,
 	TooltipTrigger: ({ children }: any) => <>{children}</>,
 	TooltipContent: ({ children }: any) => <div>{children}</div>,
+	Command: ({ children }: any) => <div data-testid="command">{children}</div>,
+	CommandInput: ({ value, onValueChange }: any) => (
+		<input data-testid="command-input" value={value} onChange={(e) => onValueChange(e.target.value)} />
+	),
+	CommandGroup: ({ children }: any) => <div data-testid="command-group">{children}</div>,
+	CommandItem: ({ children, onSelect }: any) => (
+		<div data-testid="command-item" onClick={onSelect}>
+			{children}
+		</div>
+	),
+	CommandList: ({ children }: any) => <div data-testid="command-list">{children}</div>,
+	CommandEmpty: ({ children }: any) => <div data-testid="command-empty">{children}</div>,
 	Select: ({ children, value, onValueChange }: any) => (
 		<div data-testid="select" data-value={value}>
 			<button onClick={() => onValueChange && onValueChange("test-change")}>{value}</button>
@@ -172,13 +193,63 @@ vi.mock("@src/components/mcp/McpView", () => ({
 	default: () => null,
 }))
 
-// Mock Tab components
-vi.mock("../common/Tab", () => ({
+vi.mock("../../common/Tab", () => ({
 	Tab: ({ children }: any) => <div>{children}</div>,
-	TabContent: React.forwardRef<HTMLDivElement, any>(({ children }, ref) => <div ref={ref}>{children}</div>),
+	TabContent: React.forwardRef<HTMLDivElement, any>(({ children, ...props }, ref) => (
+		<div ref={ref} {...props}>
+			{children}
+		</div>
+	)),
 	TabHeader: ({ children }: any) => <div>{children}</div>,
-	TabList: ({ children }: any) => <div>{children}</div>,
-	TabTrigger: React.forwardRef<HTMLButtonElement, any>(({ children }, ref) => <button ref={ref}>{children}</button>),
+	TabList: ({ children, value, onValueChange }: any) => (
+		<div>
+			{React.Children.map(children, (child) => {
+				if (!React.isValidElement(child)) {
+					return child
+				}
+
+				const element = child as React.ReactElement<any>
+				return React.cloneElement(element, {
+					isSelected: element.props.value === value,
+					onSelect: () => onValueChange(element.props.value),
+				})
+			})}
+		</div>
+	),
+	TabTrigger: React.forwardRef<HTMLButtonElement, any>(({ children, onSelect, ...props }, ref) => (
+		<button ref={ref} onClick={onSelect} {...props}>
+			{children}
+		</button>
+	)),
+}))
+vi.mock("@src/components/common/Tab", () => ({
+	Tab: ({ children }: any) => <div>{children}</div>,
+	TabContent: React.forwardRef<HTMLDivElement, any>(({ children, ...props }, ref) => (
+		<div ref={ref} {...props}>
+			{children}
+		</div>
+	)),
+	TabHeader: ({ children }: any) => <div>{children}</div>,
+	TabList: ({ children, value, onValueChange }: any) => (
+		<div>
+			{React.Children.map(children, (child) => {
+				if (!React.isValidElement(child)) {
+					return child
+				}
+
+				const element = child as React.ReactElement<any>
+				return React.cloneElement(element, {
+					isSelected: element.props.value === value,
+					onSelect: () => onValueChange(element.props.value),
+				})
+			})}
+		</div>
+	),
+	TabTrigger: React.forwardRef<HTMLButtonElement, any>(({ children, onSelect, ...props }, ref) => (
+		<button ref={ref} onClick={onSelect} {...props}>
+			{children}
+		</button>
+	)),
 }))
 
 // Mock all child components to isolate the test
@@ -186,8 +257,30 @@ vi.mock("../ApiConfigManager", () => ({
 	default: () => null,
 }))
 
+const mockApiOptions = ({ apiConfiguration, setApiConfigurationField }: any) => (
+	<div>
+		<span data-testid="provider-value">{apiConfiguration.apiProvider}</span>
+		<input
+			data-testid="baseten-api-key"
+			value={apiConfiguration.basetenApiKey ?? ""}
+			onChange={(event) => setApiConfigurationField("basetenApiKey", event.target.value)}
+		/>
+		{["openrouter", "baseten", "deepseek", "friendli"].map((provider) => (
+			<button
+				key={provider}
+				data-testid={`set-provider-${provider}`}
+				onClick={() => setApiConfigurationField("apiProvider", provider)}>
+				{provider}
+			</button>
+		))}
+	</div>
+)
+
 vi.mock("../ApiOptions", () => ({
-	default: () => null,
+	default: mockApiOptions,
+}))
+vi.mock("@src/components/settings/ApiOptions", () => ({
+	default: mockApiOptions,
 }))
 
 vi.mock("../AutoApproveSettings", () => ({
@@ -200,6 +293,43 @@ vi.mock("../SectionHeader", () => ({
 
 vi.mock("../Section", () => ({
 	Section: ({ children }: any) => <div>{children}</div>,
+}))
+
+vi.mock("../SearchableSetting", () => ({
+	SearchableSetting: ({ children }: any) => <div>{children}</div>,
+}))
+vi.mock("../useSettingsSearch", () => ({
+	SearchIndexProvider: ({ children }: any) => <>{children}</>,
+	useSearchIndexRegistry: () => ({
+		contextValue: { registerSetting: vi.fn() },
+		index: [],
+	}),
+	useSettingsSearch: () => ({
+		searchQuery: "",
+		setSearchQuery: vi.fn(),
+		results: [],
+		isOpen: false,
+		setIsOpen: vi.fn(),
+		clearSearch: vi.fn(),
+	}),
+}))
+vi.mock("@src/components/settings/SearchableSetting", () => ({
+	SearchableSetting: ({ children }: any) => <div>{children}</div>,
+}))
+vi.mock("@src/components/settings/useSettingsSearch", () => ({
+	SearchIndexProvider: ({ children }: any) => <>{children}</>,
+	useSearchIndexRegistry: () => ({
+		contextValue: { registerSetting: vi.fn() },
+		index: [],
+	}),
+	useSettingsSearch: () => ({
+		searchQuery: "",
+		setSearchQuery: vi.fn(),
+		results: [],
+		isOpen: false,
+		setIsOpen: vi.fn(),
+		clearSearch: vi.fn(),
+	}),
 }))
 
 // Mock all settings components
@@ -237,6 +367,11 @@ vi.mock("../UISettings", () => ({
 vi.mock("../SettingsSearch", () => ({
 	SettingsSearch: () => null,
 }))
+vi.mock("@src/components/settings/SettingsSearch", () => ({
+	SettingsSearch: () => null,
+}))
+
+let SettingsView: typeof import("../SettingsView").default
 
 describe("SettingsView - Change Detection Fix", () => {
 	let queryClient: QueryClient
@@ -303,7 +438,17 @@ describe("SettingsView - Change Detection Fix", () => {
 		openRouterImageApiKey: undefined,
 		openRouterImageGenerationSelectedModel: undefined,
 		reasoningBlockCollapsed: true,
+		autoCloseZooOpenedFiles: true,
+		autoCloseZooOpenedFilesAfterUserEdited: false,
+		autoCloseZooOpenedNewFiles: false,
+		mode: "code",
 		...overrides,
+	})
+
+	beforeAll(async () => {
+		// Import after mocks are registered so the isolated tests use the
+		// lightweight child component mocks above instead of the full settings UI.
+		SettingsView = (await import("../SettingsView")).default
 	})
 
 	beforeEach(() => {
@@ -344,7 +489,7 @@ describe("SettingsView - Change Detection Fix", () => {
 
 		// onDone should be called
 		expect(onDone).toHaveBeenCalled()
-	})
+	}, 10000)
 
 	// These tests are passing for the basic case but failing due to vi.doMock limitations
 	// The core fix has been verified - when no actual changes are made, no unsaved changes dialog appears
@@ -365,5 +510,283 @@ describe("SettingsView - Change Detection Fix", () => {
 		// - null -> value (initialization from null)
 
 		expect(true).toBe(true) // Placeholder - the real test is the running system
+	}, 10000)
+
+	it("preserves a DeepSeek provider edit after saving Baseten when the same import timestamp replays", async () => {
+		const onDone = vi.fn()
+		let extensionState = createExtensionState({
+			settingsImportedAt: 123,
+			apiConfiguration: {
+				apiProvider: "openai",
+				apiModelId: "gpt-4.1",
+			},
+		})
+
+		;(useExtensionState as any).mockImplementation(() => extensionState)
+
+		const { rerender } = render(
+			<QueryClientProvider client={queryClient}>
+				<SettingsView onDone={onDone} />
+			</QueryClientProvider>,
+		)
+
+		await waitFor(() => {
+			expect(screen.getByTestId("provider-value")).toHaveTextContent("openai")
+		})
+
+		fireEvent.click(screen.getByTestId("set-provider-baseten"))
+		fireEvent.change(screen.getByTestId("baseten-api-key"), { target: { value: "test-baseten-key" } })
+		expect(screen.getByTestId("provider-value")).toHaveTextContent("baseten")
+
+		mockPostMessage.mockClear()
+		fireEvent.click(screen.getByTestId("save-button"))
+		expect(mockPostMessage).toHaveBeenCalledWith({
+			type: "upsertApiConfiguration",
+			text: "default",
+			apiConfiguration: expect.objectContaining({
+				apiProvider: "baseten",
+				basetenApiKey: "test-baseten-key",
+			}),
+		})
+
+		fireEvent.click(screen.getByTestId("set-provider-deepseek"))
+		expect(screen.getByTestId("provider-value")).toHaveTextContent("deepseek")
+
+		await act(async () => {
+			extensionState = createExtensionState({
+				settingsImportedAt: 123,
+				soundEnabled: true,
+				apiConfiguration: {
+					apiProvider: "baseten",
+					apiModelId: "zai-org/GLM-4.6",
+					basetenApiKey: "test-baseten-key",
+				},
+			})
+			;(useExtensionState as any).mockImplementation(() => extensionState)
+
+			rerender(
+				<QueryClientProvider client={queryClient}>
+					<SettingsView onDone={onDone} />
+				</QueryClientProvider>,
+			)
+		})
+
+		// Let the import cache-busting effect run. With the old implementation,
+		// this would reset cachedState back to the replayed Baseten config.
+		await act(async () => {
+			await new Promise((resolve) => setTimeout(resolve, 0))
+		})
+
+		expect(screen.getByTestId("provider-value")).toHaveTextContent("deepseek")
+
+		mockPostMessage.mockClear()
+		fireEvent.click(screen.getByTestId("save-button"))
+
+		expect(mockPostMessage).toHaveBeenCalledWith({
+			type: "upsertApiConfiguration",
+			text: "default",
+			apiConfiguration: expect.objectContaining({
+				apiProvider: "deepseek",
+			}),
+		})
+	}, 10000)
+
+	it("resets cached provider state when a new import timestamp arrives", async () => {
+		const onDone = vi.fn()
+		let extensionState = createExtensionState({
+			settingsImportedAt: 100,
+			apiConfiguration: {
+				apiProvider: "openai",
+				apiModelId: "gpt-4.1",
+			},
+		})
+
+		;(useExtensionState as any).mockImplementation(() => extensionState)
+
+		const { rerender } = render(
+			<QueryClientProvider client={queryClient}>
+				<SettingsView onDone={onDone} />
+			</QueryClientProvider>,
+		)
+
+		await waitFor(() => {
+			expect(screen.getByTestId("provider-value")).toHaveTextContent("openai")
+		})
+
+		fireEvent.click(screen.getByTestId("set-provider-deepseek"))
+		expect(screen.getByTestId("provider-value")).toHaveTextContent("deepseek")
+
+		await act(async () => {
+			extensionState = createExtensionState({
+				settingsImportedAt: 101,
+				apiConfiguration: {
+					apiProvider: "baseten",
+					apiModelId: "zai-org/GLM-4.6",
+					basetenApiKey: "imported-baseten-key",
+				},
+			})
+			;(useExtensionState as any).mockImplementation(() => extensionState)
+
+			rerender(
+				<QueryClientProvider client={queryClient}>
+					<SettingsView onDone={onDone} />
+				</QueryClientProvider>,
+			)
+		})
+
+		await waitFor(() => {
+			expect(screen.getByTestId("provider-value")).toHaveTextContent("baseten")
+		})
+
+		await waitFor(() => {
+			expect(screen.getByTestId("save-button")).toBeDisabled()
+		})
+	}, 10000)
+
+	describe("mode synchronization", () => {
+		it("resets changeDetected and syncs cachedState when mode changes after dirty state", async () => {
+			const onDone = vi.fn()
+			let extensionState = createExtensionState({
+				mode: "code",
+				apiConfiguration: {
+					apiProvider: "openai",
+					apiModelId: "gpt-4.1",
+				},
+			})
+
+			;(useExtensionState as any).mockImplementation(() => extensionState)
+
+			const { rerender } = render(
+				<QueryClientProvider client={queryClient}>
+					<SettingsView onDone={onDone} />
+				</QueryClientProvider>,
+			)
+
+			await waitFor(() => {
+				expect(screen.getByTestId("provider-value")).toHaveTextContent("openai")
+			})
+
+			// Make a dirty change by switching provider
+			fireEvent.click(screen.getByTestId("set-provider-baseten"))
+			expect(screen.getByTestId("provider-value")).toHaveTextContent("baseten")
+
+			// Verify save button is enabled (dirty state)
+			const saveButton = screen.getByTestId("save-button") as HTMLButtonElement
+			expect(saveButton.disabled).toBe(false)
+
+			// Now change only the mode-dependent values while keeping extensionState's
+			// object identity stable. This makes the `mode` dependency load-bearing:
+			// without it, React would not re-run the sync effect.
+			await act(async () => {
+				extensionState.mode = "ask"
+				extensionState.apiConfiguration = {
+					apiProvider: "openrouter",
+					apiModelId: "claude-3.5-sonnet",
+				}
+
+				rerender(
+					<QueryClientProvider client={queryClient}>
+						<SettingsView onDone={onDone} />
+					</QueryClientProvider>,
+				)
+			})
+
+			// Let the mode sync effect run
+			await act(async () => {
+				await new Promise((resolve) => setTimeout(resolve, 0))
+			})
+
+			// Verify cachedState reflects the new mode's settings
+			await waitFor(() => {
+				expect(screen.getByTestId("provider-value")).toHaveTextContent("openrouter")
+			})
+
+			// Verify changeDetected is reset (save button should be disabled)
+			const updatedSaveButton = screen.getByTestId("save-button") as HTMLButtonElement
+			expect(updatedSaveButton.disabled).toBe(true)
+
+			// Make another dirty change while already in the new mode.
+			fireEvent.click(screen.getByTestId("set-provider-deepseek"))
+			expect(screen.getByTestId("provider-value")).toHaveTextContent("deepseek")
+			expect((screen.getByTestId("save-button") as HTMLButtonElement).disabled).toBe(false)
+
+			// Re-render with a new extensionState identity but the same mode and config
+			// name. If prevMode.current is not updated during the first mode transition,
+			// the stale ref makes this same-mode render look like another mode change and
+			// incorrectly overwrites the dirty cached provider below.
+			await act(async () => {
+				extensionState = createExtensionState({
+					mode: "ask",
+					apiConfiguration: {
+						apiProvider: "friendli",
+						apiModelId: "friendli-model",
+					},
+				})
+				;(useExtensionState as any).mockImplementation(() => extensionState)
+
+				rerender(
+					<QueryClientProvider client={queryClient}>
+						<SettingsView onDone={onDone} />
+					</QueryClientProvider>,
+				)
+			})
+
+			await act(async () => {
+				await new Promise((resolve) => setTimeout(resolve, 0))
+			})
+
+			expect(screen.getByTestId("provider-value")).toHaveTextContent("deepseek")
+			expect((screen.getByTestId("save-button") as HTMLButtonElement).disabled).toBe(false)
+		}, 20000)
+
+		it("does not trigger sync when mode has not changed", async () => {
+			const onDone = vi.fn()
+			let extensionState = createExtensionState({
+				mode: "code",
+				apiConfiguration: {
+					apiProvider: "openai",
+					apiModelId: "gpt-4.1",
+				},
+			})
+
+			;(useExtensionState as any).mockImplementation(() => extensionState)
+
+			const { rerender } = render(
+				<QueryClientProvider client={queryClient}>
+					<SettingsView onDone={onDone} />
+				</QueryClientProvider>,
+			)
+
+			await waitFor(() => {
+				expect(screen.getByTestId("provider-value")).toHaveTextContent("openai")
+			})
+
+			// Make a dirty change so we can verify it isn't overwritten by a sync
+			fireEvent.click(screen.getByTestId("set-provider-baseten"))
+			expect(screen.getByTestId("provider-value")).toHaveTextContent("baseten")
+
+			// Re-render with a new extensionState identity but the same mode and config
+			// name. This makes the guard load-bearing because the effect is eligible to
+			// re-run from the extensionState dependency, but must not sync cachedState.
+			await act(async () => {
+				extensionState = createExtensionState({
+					mode: "code",
+					apiConfiguration: {
+						apiProvider: "openai",
+						apiModelId: "gpt-4.1",
+					},
+				})
+				;(useExtensionState as any).mockImplementation(() => extensionState)
+
+				rerender(
+					<QueryClientProvider client={queryClient}>
+						<SettingsView onDone={onDone} />
+					</QueryClientProvider>,
+				)
+			})
+
+			// Provider value should remain unchanged from the dirty state
+			expect(screen.getByTestId("provider-value")).toHaveTextContent("baseten")
+		}, 20000)
 	})
 })

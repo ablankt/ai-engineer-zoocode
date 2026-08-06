@@ -130,7 +130,9 @@ describe("getEnvironmentDetails", () => {
 		;(listFiles as Mock).mockResolvedValue([["file1.ts", "file2.ts"], false])
 		;(formatResponse.formatFilesList as Mock).mockReturnValue("file1.ts\nfile2.ts")
 		;(arePathsEqual as Mock).mockReturnValue(false)
-		;(Terminal.compressTerminalOutput as Mock).mockImplementation((output: string) => output)
+		;(Terminal.compressTerminalOutput as Mock).mockImplementation((output: string) => {
+			return output
+		})
 		;(TerminalRegistry.getTerminals as Mock).mockReturnValue([])
 		;(TerminalRegistry.getBackgroundTerminals as Mock).mockReturnValue([])
 		;(TerminalRegistry.isProcessHot as Mock).mockReturnValue(false)
@@ -258,9 +260,9 @@ describe("getEnvironmentDetails", () => {
 			getCurrentWorkingDirectory: vi.fn().mockReturnValue("/test/path/build"),
 		} as MockTerminal
 
-		;(TerminalRegistry.getTerminals as Mock).mockImplementation((active: boolean) =>
-			active ? [] : [mockInactiveTerminal],
-		)
+		;(TerminalRegistry.getTerminals as Mock).mockImplementation((active: boolean) => {
+			return active ? [] : [mockInactiveTerminal]
+		})
 
 		const result = await getEnvironmentDetails(mockCline as Task)
 
@@ -294,9 +296,9 @@ describe("getEnvironmentDetails", () => {
 			getCurrentWorkingDirectory: vi.fn().mockReturnValue("/another/path"),
 		} as MockTerminal
 
-		;(TerminalRegistry.getTerminals as Mock).mockImplementation((active: boolean) =>
-			active ? [mockActiveTerminal] : [mockInactiveTerminal],
-		)
+		;(TerminalRegistry.getTerminals as Mock).mockImplementation((active: boolean) => {
+			return active ? [mockActiveTerminal] : [mockInactiveTerminal]
+		})
 		;(TerminalRegistry.getUnretrievedOutput as Mock).mockReturnValue("Server started")
 
 		const result = await getEnvironmentDetails(mockCline as Task)
@@ -443,5 +445,23 @@ describe("getEnvironmentDetails", () => {
 		await getEnvironmentDetails(mockCline as Task)
 
 		expect(getGitStatus).toHaveBeenCalledWith(mockCwd, 5)
+	})
+
+	// Regression test for https://github.com/Zoo-Code-Org/Zoo-Code/issues/1024
+	// When ripgrep cannot be found (e.g. @vscode/ripgrep >=1.18 platform layout on
+	// Windows), listFiles throws "Could not find ripgrep binary". getEnvironmentDetails
+	// must not propagate this — the task should proceed to the API call, not hang at 0%.
+	it("should degrade gracefully when listFiles rejects with an Error", async () => {
+		;(listFiles as Mock).mockRejectedValue(new Error("Could not find ripgrep binary"))
+
+		const result = await getEnvironmentDetails(mockCline as Task, true)
+		expect(result).toContain("File listing unavailable: Could not find ripgrep binary")
+	})
+
+	it("should degrade gracefully when listFiles rejects with a non-Error value", async () => {
+		;(listFiles as Mock).mockRejectedValue("unexpected string rejection")
+
+		const result = await getEnvironmentDetails(mockCline as Task, true)
+		expect(result).toContain("File listing unavailable: unexpected string rejection")
 	})
 })

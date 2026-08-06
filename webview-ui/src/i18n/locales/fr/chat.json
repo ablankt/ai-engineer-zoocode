@@ -17,7 +17,9 @@
 		"condenseContext": "Condenser intelligemment le contexte",
 		"openApiHistory": "Ouvrir l'historique de l'API",
 		"openUiHistory": "Ouvrir l'historique de l'UI",
-		"backToParentTask": "Tâche parente"
+		"backToParentTask": "Tâche parente",
+		"waitingOnSubtask": "En attente de sous-tâche",
+		"goToSubtask": "Aller à la sous-tâche"
 	},
 	"unpin": "Désépingler",
 	"pin": "Épingler",
@@ -39,6 +41,14 @@
 	"startNewTask": {
 		"title": "Commencer une nouvelle tâche",
 		"tooltip": "Démarrer une nouvelle tâche"
+	},
+	"seeNewChanges": {
+		"title": "Voir les nouveaux changements",
+		"tooltip": "Affiche les changements effectués depuis ton dernier prompt"
+	},
+	"restoreChanges": {
+		"title": "Restaurer les changements",
+		"tooltip": "Restaure les fichiers et l'état de la tâche à ton dernier prompt"
 	},
 	"proceedAnyways": {
 		"title": "Continuer quand même",
@@ -184,8 +194,8 @@
 		"wantsToEditOutsideWorkspace": "Zoo veut éditer ce fichier en dehors de l'espace de travail",
 		"wantsToEditProtected": "Zoo veut éditer un fichier de configuration protégé",
 		"wantsToCreate": "Zoo veut créer un nouveau fichier",
-		"wantsToSearchReplace": "Roo veut effectuer une recherche et remplacement sur ce fichier",
-		"didSearchReplace": "Roo a effectué une recherche et remplacement sur ce fichier",
+		"wantsToSearchReplace": "Zoo veut effectuer une recherche et remplacement sur ce fichier",
+		"didSearchReplace": "Zoo a effectué une recherche et remplacement sur ce fichier",
 		"wantsToInsert": "Zoo veut insérer du contenu dans ce fichier",
 		"wantsToInsertWithLineNumber": "Zoo veut insérer du contenu dans ce fichier à la ligne {{lineNumber}}",
 		"wantsToInsertAtEnd": "Zoo veut ajouter du contenu à la fin de ce fichier",
@@ -198,7 +208,7 @@
 		"didGenerateImage": "Zoo a généré une image"
 	},
 	"instructions": {
-		"wantsToFetch": "Roo veut récupérer des instructions détaillées pour aider à la tâche actuelle"
+		"wantsToFetch": "Zoo veut récupérer des instructions détaillées pour aider à la tâche actuelle"
 	},
 	"directoryOperations": {
 		"wantsToViewTopLevel": "Zoo veut voir les fichiers de premier niveau dans ce répertoire",
@@ -221,6 +231,7 @@
 		"running": "En cours d'exécution",
 		"pid": "PID : {{pid}}",
 		"exitStatus": "Terminé avec le statut {{exitCode}}",
+		"malformedCommand": "Commande mal formée : erreur de syntaxe shell",
 		"manageCommands": "Commandes approuvées automatiquement",
 		"addToAllowed": "Ajouter à la liste autorisée",
 		"removeFromAllowed": "Retirer de la liste autorisée",
@@ -330,16 +341,11 @@
 	"announcement": {
 		"title": "Zoo Code {{version}} est disponible",
 		"support": "Soutiens Zoo Code en nous donnant une étoile sur <githubLink>GitHub</githubLink>.",
-		"handoff": {
-			"heading": "Roo Code est de retour ! Désormais comme plugin maintenu par la communauté sous le nom Zoo Code !!",
-			"description": "Si tu n'as pas suivi, l'équipe Roo Code a récemment annoncé qu'elle arrêtait le développement de Roo Code et archivait le travail accompli. Mais pas de panique : la communauté a pris le relais pour faire vivre l'héritage de Roo Code avec un nouveau nom et un nouveau foyer ! Nous ne sommes plus juste un seul « Roo », nous sommes une communauté, un « Zoo » si tu veux. Zoo Code est un plugin maintenu par la communauté qui reprend là où Roo Code s'est arrêté, et nous nous engageons à préserver l'esprit de Roo tout en ajoutant de nouvelles fonctionnalités et améliorations. Nous voulons adresser un immense merci à toute l'équipe Roo Code pour son travail incroyable et pour avoir créé un outil aussi formidable pour les développeurs. Nous sommes ravis de poursuivre sur leurs bases et de voir jusqu'où la communauté mènera Zoo Code.",
-			"readMore": "Voir la nouvelle page d'accueil de Zoo Code et lire l'annonce complète"
-		},
 		"release": {
 			"heading": "Nouveautés :",
-			"highlight1": "Claude Opus 4.8 et Opencode Go : Claude Opus 4.8 a été ajouté sur Anthropic, Bedrock et Vertex, plus Opencode Go comme nouveau fournisseur de premier plan.",
-			"highlight2": "Annulation de tâches fiable : Annuler une tâche termine désormais correctement le processus en cours, avec une relance automatique de Ctrl+C pour les processus récalcitrants.",
-			"highlight3": "Correctifs fournisseurs et éditeur : Correction des ID de modèles personnalisés Gemini, du truncage des diffs Grok, de la détection de PowerShell sous Windows et du nom des actions de code VS Code."
+			"highlight1": "Providers Moonshot et Kimi Code — connecte-toi aux modèles Moonshot avec la découverte en temps réel, ou à Kimi Code via son flux d'appareil OAuth.",
+			"highlight2": "Prise en charge des derniers modèles — utilise Claude Opus 5 avec tous les providers, ainsi que Kimi K3, Gemini 3.6 Flash et MiniMax-M3.",
+			"highlight3": "Workflows plus fiables — abandonne proprement les sous-tâches interrompues et indexe les fichiers Dart et texte brut de ta base de code."
 		},
 		"cloudAgents": {
 			"heading": "Nouveautés dans le Cloud :",

@@ -37,6 +37,7 @@
 		"contextManagement": "Context",
 		"terminal": "Terminal",
 		"slashCommands": "Slash Commands",
+		"rules": "Rules",
 		"prompts": "Prompts",
 		"ui": "UI",
 		"experimental": "Experimental",
@@ -62,6 +63,24 @@
 		"debugMode": {
 			"label": "Enable debug mode",
 			"description": "Enable debug mode to show additional buttons in the task header for viewing API conversation history and UI messages as prettified JSON in temporary files."
+		},
+		"rooHistoryImport": {
+			"settingLabel": "Import history from Roo Code",
+			"cardTitle": "Roo Code history",
+			"cardDescription": "Copy saved Roo Code conversations into Zoo Code.",
+			"statusImporting": "Importing history",
+			"statusFailed": "Import failed",
+			"statusComplete": "Import complete",
+			"buttonImporting": "Importing from Roo Code...",
+			"buttonIdle": "Import history from Roo Code",
+			"summaryFailedWithFiles": "{{copied}} of {{total}} files copied before the import stopped.",
+			"summaryFailedNoFiles": "The import stopped before any files were copied.",
+			"summaryCopied": "{{copied}} of {{total}} files copied",
+			"detailFailed": "Start a new import attempt to try again.",
+			"detailTasksImported_one": "Imported {{count}} of {{total}} task history.",
+			"detailTasksImported_other": "Imported {{count}} of {{total}} task histories.",
+			"detailPreparing": "Preparing Roo Code history import.",
+			"progressAriaLabel": "Roo history import progress"
 		}
 	},
 	"slashCommands": {
@@ -98,6 +117,52 @@
 			"nameInvalid": "Name must contain only letters, numbers, hyphens, and underscores"
 		},
 		"footer": "Use slash commands for quick access to frequently used prompts and workflows."
+	},
+	"rules": {
+		"description": "Manage Zoo Code rule files from global and workspace .roo/rules directories. Create general rules or mode-specific rules without manually browsing configuration folders.",
+		"workspaceRules": "Workspace Rules",
+		"globalRules": "Global Rules",
+		"noWorkspaceRules": "No rules in this project yet.",
+		"noGlobalRules": "No global rules yet.",
+		"addRule": "Add Rule",
+		"editRule": "Edit rule",
+		"deleteRule": "Delete rule",
+		"modeLabel": "Mode: {{mode}}",
+		"deleteDialog": {
+			"title": "Delete Rule",
+			"description": "Are you sure you want to delete the rule \"{{name}}\"? This action cannot be undone.",
+			"confirm": "Delete",
+			"cancel": "Cancel"
+		},
+		"createDialog": {
+			"title": "Create New Rule",
+			"nameLabel": "Name",
+			"namePlaceholder": "my-rule-name",
+			"nameHint": "Lowercase letters, numbers, hyphens and underscores only. .md is added automatically.",
+			"scopeLabel": "Location",
+			"kindLabel": "Rule type",
+			"modeLabel": "Mode",
+			"modePlaceholder": "Select a mode",
+			"create": "Create",
+			"cancel": "Cancel"
+		},
+		"scope": {
+			"global": "Global (available in all workspaces)",
+			"project": "Workspace"
+		},
+		"kind": {
+			"generic": "General rules",
+			"mode": "Mode-specific rules",
+			"genericBadge": "General",
+			"modeBadge": "Mode"
+		},
+		"validation": {
+			"nameRequired": "Name is required",
+			"nameTooLong": "Name must be 64 characters or less",
+			"nameInvalid": "Name must contain only lowercase letters, numbers, hyphens, and underscores",
+			"modeRequired": "Mode is required for mode-specific rules"
+		},
+		"footer": "Rules load mode-specific guidance before general guidance. Global rules load before workspace rules."
 	},
 	"skills": {
 		"description": "Skills encapsulate contextual instructions and workflows, which the agent can load on-demand. They can include general instructions, specific workflows and even scripts to be run as needed. <DocsLink>Learn more</DocsLink>",
@@ -165,6 +230,18 @@
 			"label": "Chat font size",
 			"description": "Set the font size (in pixels) for the Zoo Code chat. Leave at the default to match VS Code's font size.",
 			"reset": "Use VS Code default"
+		},
+		"autoCloseZooOpenedFiles": {
+			"label": "Auto-close files Zoo opened",
+			"description": "When enabled, editor tabs that Zoo opened transiently for a diff will be closed automatically after the edit is accepted or rejected. Tabs the user already had open before the edit are never auto-closed."
+		},
+		"autoCloseZooOpenedFilesAfterUserEdited": {
+			"label": "Auto-close even after user interaction",
+			"description": "When enabled, Zoo-opened tabs are closed even if the user clicked or typed inside the file or diff during the edit session. Has no effect when 'Auto-close files Zoo opened' is disabled."
+		},
+		"autoCloseZooOpenedNewFiles": {
+			"label": "Auto-close newly created files",
+			"description": "When enabled, tabs for files that Zoo created (rather than modified) will also be closed automatically after the edit is accepted."
 		}
 	},
 	"prompts": {
@@ -203,6 +280,7 @@
 		"openRouterApiKeyPlaceholder": "Enter your OpenRouter API key",
 		"openRouterProviderRoutingLabel": "OpenRouter Provider Routing",
 		"openRouterProviderRoutingDescription": "OpenRouter routes requests to the best available providers for your embedding model. By default, requests are load balanced across the top providers to maximize uptime. However, you can choose a specific provider to use for this model.",
+		"sembleProvider": "Semble - Local",
 		"openaiCompatibleProvider": "OpenAI Compatible",
 		"openAiKeyLabel": "OpenAI API Key",
 		"openAiKeyPlaceholder": "Enter your OpenAI API key",
@@ -384,6 +462,8 @@
 		"getVercelAiGatewayApiKey": "Get Vercel AI Gateway API Key",
 		"opencodeGoApiKey": "Opencode Go API Key",
 		"getOpencodeGoApiKey": "Get Opencode Go API Key",
+		"kenariApiKey": "Kenari API Key",
+		"getKenariApiKey": "Get Kenari API Key",
 		"apiKeyStorageNotice": "API keys are stored securely in VSCode's Secret Storage",
 		"openAiCodexRateLimits": {
 			"title": "Usage Limits for Codex{{planLabel}}",
@@ -452,11 +532,24 @@
 		"poeBaseUrl": "Poe Base URL",
 		"fireworksApiKey": "Fireworks API Key",
 		"getFireworksApiKey": "Get Fireworks API Key",
+		"friendliApiKey": "Friendli API Key",
+		"getFriendliApiKey": "Get Friendli API Key",
 		"deepSeekApiKey": "DeepSeek API Key",
 		"getDeepSeekApiKey": "Get DeepSeek API Key",
 		"moonshotApiKey": "Moonshot API Key",
 		"getMoonshotApiKey": "Get Moonshot API Key",
 		"moonshotBaseUrl": "Moonshot Entrypoint",
+		"kimiCode": {
+			"authMethod": "Authentication method",
+			"oauth": "Kimi Code subscription (OAuth)",
+			"apiKey": "Kimi Code API key",
+			"apiKeyLabel": "Kimi Code API Key",
+			"signIn": "Sign in to Kimi Code",
+			"signOut": "Sign out",
+			"authenticated": "Signed in to Kimi Code",
+			"deviceCodeHelp": "Enter this device code in the Kimi authorization page:",
+			"docs": "Kimi Code documentation"
+		},
 		"minimaxApiKey": "MiniMax API Key",
 		"getMiniMaxApiKey": "Get MiniMax API Key",
 		"minimaxBaseUrl": "MiniMax Entrypoint",
@@ -543,6 +636,8 @@
 			"apiKeyHelp": "Optional API key for authenticated Ollama instances or cloud services. Leave empty for local installations.",
 			"numCtx": "Context Window Size (num_ctx)",
 			"numCtxHelp": "Override the model's default context window size. Leave empty to use the model's Modelfile configuration. Minimum value is 128.",
+			"thinking": "Enable Thinking",
+			"thinkingHelp": "Enable Ollama's native thinking for reasoning models (e.g. qwen3, deepseek-r1). When enabled, the model's reasoning is streamed and displayed separately. Unsupported models will ignore this setting.",
 			"description": "Ollama allows you to run models locally on your computer. For instructions on how to get started, see their quickstart guide.",
 			"warning": "Note: Zoo Code uses complex prompts and works best with Claude models. Less capable models may not work as expected."
 		},
@@ -619,7 +714,8 @@
 			"low": "Low",
 			"medium": "Medium",
 			"high": "High",
-			"xhigh": "Extra High"
+			"xhigh": "Extra High",
+			"max": "Max"
 		},
 		"verbosity": {
 			"label": "Output Verbosity",
@@ -729,6 +825,12 @@
 				"description": "Time to wait after file writes before proceeding, allowing diagnostic tools to process changes and detect issues."
 			}
 		},
+		"fileEdits": {
+			"diffFuzzyThreshold": {
+				"label": "Diff match threshold",
+				"description": "Lower thresholds make file edits more resilient to formatting and whitespace variations. A threshold of 100% requires an exact match."
+			}
+		},
 		"condensingThreshold": {
 			"label": "Condensing Trigger Threshold",
 			"selectProfile": "Configure threshold for profile",
@@ -818,12 +920,11 @@
 			"description": "Turn this on to inherit environment variables from the parent VS Code process. <0>Learn more</0>"
 		},
 		"profile": {
-			"label": "Zoo Code terminal override",
-			"default": "Use VS Code default profile (recommended)",
-			"overrideLabel": "Override shell for Zoo Code",
+			"label": "Shell for Zoo Code",
+			"followVscode": "Follow VS Code profile (recommended)",
 			"configureButton": "Choose default profile in VS Code",
 			"noProfiles": "(no path-based profiles found in terminal.integrated.profiles)",
-			"description": "By default Zoo Code uses whatever shell VS Code is configured to use. Select Override to pick a path-based shell profile exposed by VS Code. Source-only profiles (e.g. the built-in PowerShell entry) cannot be listed here. <0>Learn more</0>"
+			"description": "Zoo Code uses the shell configured in VS Code by default. Select a specific terminal profile to override this. Only path-based profiles from terminal.integrated.profiles are listed here. <0>Learn more</0>"
 		}
 	},
 	"advancedSettings": {

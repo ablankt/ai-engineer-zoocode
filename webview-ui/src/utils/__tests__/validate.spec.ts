@@ -1,4 +1,4 @@
-import type { ProviderSettings, OrganizationAllowList, RouterModels } from "@roo-code/types"
+import { type ProviderSettings, type OrganizationAllowList, type RouterModels } from "@roo-code/types"
 
 // Mock i18next to return translation keys with interpolated values
 vi.mock("i18next", () => ({
@@ -52,7 +52,10 @@ describe("Model Validation Functions", () => {
 		poe: {},
 		deepseek: {},
 		"opencode-go": {},
+		kenari: {},
 		"zoo-gateway": {},
+		"kimi-code": {},
+		moonshot: {},
 	}
 
 	const allowAllOrganization: OrganizationAllowList = {
@@ -216,6 +219,64 @@ describe("Model Validation Functions", () => {
 			expect(result).toBe("settings:validation.modelId")
 		})
 	})
+	describe("Kenari validation", () => {
+		it("returns an apiKey error when the Kenari API key is missing", () => {
+			const config: ProviderSettings = {
+				apiProvider: "kenari",
+				kenariModelId: "glm-5.1",
+				// Missing kenariApiKey
+			}
+
+			const result = validateApiConfigurationExcludingModelErrors(config, mockRouterModels, allowAllOrganization)
+			expect(result).toBe("settings:validation.apiKey")
+		})
+
+		it("returns undefined for a valid Kenari configuration", () => {
+			const config: ProviderSettings = {
+				apiProvider: "kenari",
+				kenariApiKey: "valid-key",
+				kenariModelId: "glm-5.1",
+			}
+
+			const result = validateApiConfigurationExcludingModelErrors(config, mockRouterModels, allowAllOrganization)
+			expect(result).toBeUndefined()
+		})
+
+		it("returns a modelId error when no Kenari model id is set", () => {
+			const config: ProviderSettings = {
+				apiProvider: "kenari",
+				kenariApiKey: "valid-key",
+				// Missing kenariModelId
+			}
+
+			const result = getModelValidationError(config, mockRouterModels, allowAllOrganization)
+			expect(result).toBe("settings:validation.modelId")
+		})
+	})
+
+	describe("Friendli validation", () => {
+		it("returns an apiKey error when the Friendli API key is missing", () => {
+			const config: ProviderSettings = {
+				apiProvider: "friendli",
+				apiModelId: "zai-org/GLM-5.2",
+				// Missing friendliApiKey
+			}
+
+			const result = validateApiConfigurationExcludingModelErrors(config, mockRouterModels, allowAllOrganization)
+			expect(result).toBe("settings:validation.apiKey")
+		})
+
+		it("returns undefined for a valid Friendli configuration", () => {
+			const config: ProviderSettings = {
+				apiProvider: "friendli",
+				friendliApiKey: "valid-key",
+				apiModelId: "zai-org/GLM-5.2",
+			}
+
+			const result = validateApiConfigurationExcludingModelErrors(config, mockRouterModels, allowAllOrganization)
+			expect(result).toBeUndefined()
+		})
+	})
 
 	describe("Zoo Gateway validation", () => {
 		describe("validateApiConfiguration (welcome-view entry point)", () => {
@@ -304,6 +365,48 @@ describe("Model Validation Functions", () => {
 				)
 				expect(result).toContain("settings:validation.providerNotAllowed")
 			})
+		})
+	})
+
+	describe("Kimi Code validation", () => {
+		it("returns undefined when using OAuth auth method", () => {
+			const config: ProviderSettings = {
+				apiProvider: "kimi-code",
+				kimiCodeAuthMethod: "oauth",
+			}
+
+			const result = validateApiConfigurationExcludingModelErrors(config, mockRouterModels, allowAllOrganization)
+			expect(result).toBeUndefined()
+		})
+
+		it("returns undefined when auth method is not specified (defaults to OAuth)", () => {
+			const config: ProviderSettings = {
+				apiProvider: "kimi-code",
+			}
+
+			const result = validateApiConfigurationExcludingModelErrors(config, mockRouterModels, allowAllOrganization)
+			expect(result).toBeUndefined()
+		})
+
+		it("returns apiKey error when using api-key auth method without key", () => {
+			const config: ProviderSettings = {
+				apiProvider: "kimi-code",
+				kimiCodeAuthMethod: "api-key",
+			}
+
+			const result = validateApiConfigurationExcludingModelErrors(config, mockRouterModels, allowAllOrganization)
+			expect(result).toBe("settings:validation.apiKey")
+		})
+
+		it("returns undefined when using api-key auth method with key", () => {
+			const config: ProviderSettings = {
+				apiProvider: "kimi-code",
+				kimiCodeAuthMethod: "api-key",
+				kimiCodeApiKey: "valid-key",
+			}
+
+			const result = validateApiConfigurationExcludingModelErrors(config, mockRouterModels, allowAllOrganization)
+			expect(result).toBeUndefined()
 		})
 	})
 })

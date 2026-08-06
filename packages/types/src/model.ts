@@ -23,7 +23,7 @@ export type ReasoningEffortWithMinimal = z.infer<typeof reasoningEffortWithMinim
  * Extended Reasoning Effort (includes "none" and "minimal")
  * Note: "disable" is a UI/control value, not a value sent as effort
  */
-export const reasoningEffortsExtended = ["none", "minimal", "low", "medium", "high", "xhigh"] as const
+export const reasoningEffortsExtended = ["none", "minimal", "low", "medium", "high", "xhigh", "max"] as const
 
 export const reasoningEffortExtendedSchema = z.enum(reasoningEffortsExtended)
 
@@ -32,7 +32,16 @@ export type ReasoningEffortExtended = z.infer<typeof reasoningEffortExtendedSche
 /**
  * Reasoning Effort user setting (includes "disable")
  */
-export const reasoningEffortSettingValues = ["disable", "none", "minimal", "low", "medium", "high", "xhigh"] as const
+export const reasoningEffortSettingValues = [
+	"disable",
+	"none",
+	"minimal",
+	"low",
+	"medium",
+	"high",
+	"xhigh",
+	"max",
+] as const
 export const reasoningEffortSettingSchema = z.enum(reasoningEffortSettingValues)
 
 /**
@@ -45,12 +54,33 @@ export const verbosityLevelsSchema = z.enum(verbosityLevels)
 
 export type VerbosityLevel = z.infer<typeof verbosityLevelsSchema>
 
+/** Serialized service tier field used in provider request payloads and responses. */
+export const SERVICE_TIER_KEY = "service_tier"
+
 /**
- * Service tiers (OpenAI Responses API)
+ * Service tiers for the public OpenAI Responses API.
  */
-export const serviceTiers = ["default", "flex", "priority"] as const
+export const OpenAiServiceTier = {
+	Default: "default",
+	Flex: "flex",
+	Priority: "priority",
+} as const
+
+export const serviceTiers = [OpenAiServiceTier.Default, OpenAiServiceTier.Flex, OpenAiServiceTier.Priority] as const
 export const serviceTierSchema = z.enum(serviceTiers)
 export type ServiceTier = z.infer<typeof serviceTierSchema>
+
+/**
+ * Service tiers for Codex requests authenticated through a ChatGPT subscription.
+ */
+export const OpenAiCodexServiceTier = {
+	Default: "default",
+	Priority: "priority",
+} as const
+
+export const openAiCodexServiceTiers = [OpenAiCodexServiceTier.Default, OpenAiCodexServiceTier.Priority] as const
+export const openAiCodexServiceTierSchema = z.enum(openAiCodexServiceTiers)
+export type OpenAiCodexServiceTier = z.infer<typeof openAiCodexServiceTierSchema>
 
 /**
  * ModelParameter
@@ -93,7 +123,7 @@ export const modelInfoSchema = z.object({
 	defaultTemperature: z.number().optional(),
 	requiredReasoningBudget: z.boolean().optional(),
 	supportsReasoningEffort: z
-		.union([z.boolean(), z.array(z.enum(["disable", "none", "minimal", "low", "medium", "high", "xhigh"]))])
+		.union([z.boolean(), z.array(z.enum(["disable", "none", "minimal", "low", "medium", "high", "xhigh", "max"]))])
 		.optional(),
 	requiredReasoningEffort: z.boolean().optional(),
 	preserveReasoning: z.boolean().optional(),
@@ -113,6 +143,7 @@ export const modelInfoSchema = z.object({
 		})
 		.optional(),
 	description: z.string().optional(),
+	displayName: z.string().optional(),
 	// Default effort value for models that support reasoning effort
 	reasoningEffort: reasoningEffortExtendedSchema.optional(),
 	minTokensPerCachePoint: z.number().optional(),

@@ -2,6 +2,7 @@
 
 import { render, screen, fireEvent, waitFor } from "@/utils/test-utils"
 import { ContextManagementSettings } from "../ContextManagementSettings"
+import { vscode } from "@/utils/vscode"
 
 // Mock the translation hook
 vi.mock("@/hooks/useAppTranslation", () => ({
@@ -47,8 +48,16 @@ vi.mock("@/components/ui", () => ({
 			{children}
 		</button>
 	),
-	Select: ({ children, ...props }: any) => (
-		<div role="combobox" {...props}>
+	Select: ({ children, value, onValueChange, ...props }: any) => (
+		<div role="combobox" data-value={value} {...props}>
+			{/* Hidden trigger lets tests drive profile selection deterministically:
+			    set data-next-value on the button, then click it. */}
+			<button
+				type="button"
+				aria-hidden="true"
+				data-testid="threshold-profile-change"
+				onClick={(e: any) => onValueChange?.(e.currentTarget.getAttribute("data-next-value"))}
+			/>
 			{children}
 		</div>
 	),
@@ -391,6 +400,26 @@ describe("ContextManagementSettings", () => {
 			render(<ContextManagementSettings {...autoCondenseProps} />)
 			expect(screen.getByText("75%")).toBeInTheDocument()
 		})
+
+		// Case 4: profileThresholds must buffer through cachedState, not persist before Save.
+		it("buffers profile threshold changes without persisting before Save", () => {
+			const mockSetCachedStateField = vitest.fn()
+			const props = { ...autoCondenseProps, setCachedStateField: mockSetCachedStateField }
+			render(<ContextManagementSettings {...props} />)
+
+			// Select a non-default profile so the slider edits profileThresholds.
+			const profileTrigger = screen.getByTestId("threshold-profile-change")
+			profileTrigger.setAttribute("data-next-value", "config-1")
+			fireEvent.click(profileTrigger)
+
+			// Move the threshold slider for that profile.
+			const slider = screen.getByTestId("condense-threshold-slider")
+			slider.focus()
+			fireEvent.keyDown(slider, { key: "ArrowRight" })
+
+			expect(mockSetCachedStateField).toHaveBeenCalledWith("profileThresholds", { "config-1": 76 })
+			expect(vscode.postMessage).not.toHaveBeenCalledWith(expect.objectContaining({ type: "updateSettings" }))
+		})
 	})
 
 	it("handles boundary values for sliders", () => {
@@ -477,6 +506,27 @@ describe("ContextManagementSettings", () => {
 			expect(screen.getByText("settings:contextManagement.openTabs.label")).toBeInTheDocument()
 			expect(screen.getByText("settings:contextManagement.workspaceFiles.label")).toBeInTheDocument()
 			expect(screen.getByText("settings:contextManagement.rooignore.label")).toBeInTheDocument()
+		})
+	})
+
+	describe("diffFuzzyThreshold", () => {
+		it("renders diff fuzzy threshold slider with default value", () => {
+			render(<ContextManagementSettings {...defaultProps} />)
+
+			const slider = screen.getByTestId("diff-fuzzy-threshold-slider")
+			expect(slider).toBeInTheDocument()
+		})
+
+		it("calls setCachedStateField when slider changes", async () => {
+			const setCachedStateField = vi.fn()
+			render(<ContextManagementSettings {...defaultProps} setCachedStateField={setCachedStateField} />)
+
+			const slider = screen.getByTestId("diff-fuzzy-threshold-slider")
+			fireEvent.change(slider, { target: { value: "0.85" } })
+
+			await waitFor(() => {
+				expect(setCachedStateField).toHaveBeenCalledWith("diffFuzzyThreshold", 0.85)
+			})
 		})
 	})
 })

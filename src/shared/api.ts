@@ -179,14 +179,17 @@ const dynamicProviderExtras = {
 	openrouter: {} as {}, // eslint-disable-line @typescript-eslint/no-empty-object-type
 	"vercel-ai-gateway": {} as {}, // eslint-disable-line @typescript-eslint/no-empty-object-type
 	"zoo-gateway": {} as { apiKey?: string; baseUrl?: string },
-	litellm: {} as { apiKey: string; baseUrl: string },
+	litellm: {} as { apiKey?: string; baseUrl: string },
 	requesty: {} as { apiKey?: string; baseUrl?: string },
 	unbound: {} as { apiKey?: string },
 	ollama: {} as {}, // eslint-disable-line @typescript-eslint/no-empty-object-type
 	lmstudio: {} as {}, // eslint-disable-line @typescript-eslint/no-empty-object-type
 	poe: {} as { apiKey?: string; baseUrl?: string },
 	deepseek: {} as { apiKey?: string; baseUrl?: string },
+	moonshot: {} as { apiKey?: string; baseUrl?: string },
 	"opencode-go": {} as { apiKey?: string },
+	kenari: {} as { apiKey?: string },
+	"kimi-code": {} as { apiKey?: string },
 } as const satisfies Record<RouterName, object>
 
 // Build the dynamic options union from the map, intersected with CommonFetchParams

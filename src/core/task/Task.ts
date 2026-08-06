@@ -6,6 +6,7 @@ import { v7 as uuidv7 } from "uuid"
 import EventEmitter from "events"
 
 import { AskIgnoredError } from "./AskIgnoredError"
+import { RateLimitClock, createRateLimitClock } from "./RateLimitClock"
 
 import { Anthropic } from "@anthropic-ai/sdk"
 import OpenAI from "openai"
@@ -53,6 +54,7 @@ import {
 	ConsecutiveMistakeError,
 	MAX_MCP_TOOLS_THRESHOLD,
 	countEnabledMcpTools,
+	providerIdentifiers,
 } from "@roo-code/types"
 import { TelemetryService } from "@roo-code/telemetry"
 import { CloudService } from "@roo-code/cloud"
@@ -157,7 +159,9 @@ export interface TaskOptions extends CreateTaskOptions {
 	initialTodos?: TodoItem[]
 	workspacePath?: string
 	/** Initial status for the task's history item (e.g., "active" for child tasks) */
-	initialStatus?: "active" | "delegated" | "completed"
+	initialStatus?: "active" | "delegated" | "completed" | "interrupted"
+	rateLimitClock?: RateLimitClock
+	diffFuzzyThreshold?: number
 }
 
 export class Task extends EventEmitter<TaskEvents> implements TaskLike {
@@ -284,16 +288,8 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 	// API
 	apiConfiguration: ProviderSettings
 	api: ApiHandler
-	private static lastGlobalApiRequestTime?: number
+	private rateLimitClock: RateLimitClock
 	private autoApprovalHandler: AutoApprovalHandler
-
-	/**
-	 * Reset the global API request timestamp. This should only be used for testing.
-	 * @internal
-	 */
-	static resetGlobalApiRequestTime(): void {
-		Task.lastGlobalApiRequestTime = undefined
-	}
 
 	toolRepetitionDetector: ToolRepetitionDetector
 	rooIgnoreController?: RooIgnoreController
@@ -362,6 +358,29 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 	assistantMessageSavedToHistory = false
 
 	/**
+	 * Fire-and-forget wrapper around `presentAssistantMessage` that swallows the
+	 * expected cancellation rejection (the presenter throws when `this.abort` is set)
+	 * and logs any other failure. Keeping it non-blocking preserves the streaming
+	 * presenter's self-locking semantics while preventing unhandled promise rejections
+	 * from crashing the extension host.
+	 */
+	private presentAssistantMessageSafe(): void {
+		void presentAssistantMessage(this).catch((error) => {
+			// Discriminate on the error message rather than `this.abort` state,
+			// which can flip between the throw and the catch microtask running:
+			// a real failure followed by an abort flip would otherwise be
+			// silently swallowed, and a stale abort error logged as a failure.
+			// The abort throw site in presentAssistantMessage emits a message
+			// ending in "aborted" (matching the other abort-throw contracts in
+			// this file), so we suppress exactly that.
+			if (error instanceof Error && error.message.endsWith("aborted")) {
+				return
+			}
+			console.error(`[Task#presentAssistantMessage] task ${this.taskId}.${this.instanceId} failed:`, error)
+		})
+	}
+
+	/**
 	 * Push a tool_result block to userMessageContent, preventing duplicates.
 	 * Duplicate tool_use_ids cause API errors.
 	 *
@@ -387,6 +406,8 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 	didToolFailInCurrentTurn = false
 	didCompleteReadingStream = false
 	private _started = false
+	private _runPromise: Promise<void> | undefined
+	private readonly _isHistoryTask: boolean
 	// No streaming parser is required.
 	assistantMessageParser?: undefined
 	private providerProfileChangeListener?: (config: { name: string; provider?: string }) => void
@@ -413,7 +434,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 	private cloudSyncedMessageTimestamps: Set<number> = new Set()
 
 	// Initial status for the task's history item (set at creation time to avoid race conditions)
-	private readonly initialStatus?: "active" | "delegated" | "completed"
+	private readonly initialStatus?: "active" | "delegated" | "completed" | "interrupted"
 
 	// MessageManager for high-level message operations (lazy initialized)
 	private _messageManager?: MessageManager
@@ -437,6 +458,8 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		initialTodos,
 		workspacePath,
 		initialStatus,
+		rateLimitClock,
+		diffFuzzyThreshold,
 	}: TaskOptions) {
 		super()
 
@@ -467,6 +490,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 			task: historyItem ? historyItem.task : task,
 			images: historyItem ? [] : images,
 		}
+		this._isHistoryTask = !!historyItem && !task && !images
 
 		// Normal use-case is usually retry similar history task with new workspace.
 		this.workspacePath = parentTask
@@ -486,6 +510,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 
 		this.apiConfiguration = apiConfiguration
 		this.api = buildApiHandler(this.apiConfiguration)
+		this.rateLimitClock = rateLimitClock ?? createRateLimitClock()
 		this.autoApprovalHandler = new AutoApprovalHandler()
 
 		this.consecutiveMistakeLimit = consecutiveMistakeLimit ?? DEFAULT_CONSECUTIVE_MISTAKE_LIMIT
@@ -524,7 +549,15 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		this.messageQueueStateChangedHandler = () => {
 			this.emit(RooCodeEventName.TaskUserMessage, this.taskId)
 			this.emit(RooCodeEventName.QueuedMessagesUpdated, this.taskId, this.messageQueueService.messages)
-			this.providerRef.deref()?.postStateToWebviewWithoutTaskHistory()
+			void this.providerRef
+				.deref()
+				?.postStateToWebviewWithoutTaskHistory()
+				.catch((error) => {
+					console.error(
+						"[Task#messageQueueStateChangedHandler] postStateToWebviewWithoutTaskHistory failed:",
+						error,
+					)
+				})
 		}
 
 		this.messageQueueService.on("stateChanged", this.messageQueueStateChangedHandler)
@@ -533,7 +566,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		this.setupProviderProfileChangeListener(provider)
 
 		// Set up diff strategy
-		this.diffStrategy = new MultiSearchReplaceDiffStrategy()
+		this.diffStrategy = new MultiSearchReplaceDiffStrategy(diffFuzzyThreshold)
 
 		this.toolRepetitionDetector = new ToolRepetitionDetector(this.consecutiveMistakeLimit)
 
@@ -569,9 +602,13 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		if (startTask) {
 			this._started = true
 			if (task || images) {
-				this.startTask(task, images)
+				void this.startTask(task, images).catch((error) => {
+					console.error("[Task#constructor] startTask failed:", error)
+				})
 			} else if (historyItem) {
-				this.resumeTaskFromHistory()
+				void this.resumeTaskFromHistory().catch((error) => {
+					console.error("[Task#constructor] resumeTaskFromHistory failed:", error)
+				})
 			} else {
 				throw new Error("Either historyItem or task/images must be provided")
 			}
@@ -1094,7 +1131,9 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 			// - Final state is emitted when updates stop (trailing: true)
 			this.debouncedEmitTokenUsage(tokenUsage, this.toolUsage)
 
-			await this.providerRef.deref()?.updateTaskHistory(historyItem)
+			const provider = this.providerRef.deref()
+			const existingStatus = provider?.taskHistoryStore.get(this.taskId)?.status
+			await provider?.updateTaskHistory(existingStatus ? { ...historyItem, status: existingStatus } : historyItem)
 			return true
 		} catch (error) {
 			console.error("Failed to save Roo messages:", error)
@@ -1136,6 +1175,17 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 
 		let askTs: number
 
+		// Resolve auto-approval before adding the message so the state snapshot
+		// sent to the webview already carries isAnswered:true when the ask will
+		// be immediately resolved. This eliminates the race between the state
+		// update (which shows approval buttons) and the former separate
+		// clearApprovalButtons message (which could arrive before buttons were
+		// rendered, leaving them stuck on-screen).
+		const provider = this.providerRef.deref()
+		const state = provider ? await provider.getState() : undefined
+		const approval = await checkAutoApproval({ state, ask: type, text, isProtected })
+		const isAutoAnswered = approval.decision === "approve" || approval.decision === "deny"
+
 		if (partial !== undefined) {
 			const lastMessage = this.clineMessages.at(-1)
 
@@ -1153,7 +1203,13 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 					// data or one whole message at a time so ignore partial for
 					// saves, and only post parts of partial message instead of
 					// whole array in new listener.
-					this.updateClineMessage(lastMessage)
+					// Fire-and-forget: the webview post is internally guarded, but
+					// the `RooCodeEventName.Message` emit can synchronously throw
+					// if any consumer-attached listener does, which would surface
+					// here as an unhandled rejection. Log it instead.
+					this.updateClineMessage(lastMessage).catch((error) => {
+						console.error("[Task#ask] updateClineMessage failed:", error)
+					})
 					// console.log("Task#ask: current ask promise was ignored (#1)")
 					throw new AskIgnoredError("updating existing partial")
 				} else {
@@ -1190,8 +1246,15 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 					lastMessage.partial = false
 					lastMessage.progressStatus = progressStatus
 					lastMessage.isProtected = isProtected
+					if (isAutoAnswered) {
+						lastMessage.isAnswered = true
+					}
 					await this.saveClineMessages()
-					this.updateClineMessage(lastMessage)
+					// Fire-and-forget: see updateClineMessage call above for the
+					// rationale on the .catch arm.
+					this.updateClineMessage(lastMessage).catch((error) => {
+						console.error("[Task#ask] updateClineMessage failed:", error)
+					})
 				} else {
 					// This is a new and complete message, so add it like normal.
 					this.askResponse = undefined
@@ -1199,7 +1262,14 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 					this.askResponseImages = undefined
 					askTs = Date.now()
 					this.lastMessageTs = askTs
-					await this.addToClineMessages({ ts: askTs, type: "ask", ask: type, text, isProtected })
+					await this.addToClineMessages({
+						ts: askTs,
+						type: "ask",
+						ask: type,
+						text,
+						isProtected,
+						isAnswered: isAutoAnswered || undefined,
+					})
 				}
 			}
 		} else {
@@ -1209,15 +1279,17 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 			this.askResponseImages = undefined
 			askTs = Date.now()
 			this.lastMessageTs = askTs
-			await this.addToClineMessages({ ts: askTs, type: "ask", ask: type, text, isProtected })
+			await this.addToClineMessages({
+				ts: askTs,
+				type: "ask",
+				ask: type,
+				text,
+				isProtected,
+				isAnswered: isAutoAnswered || undefined,
+			})
 		}
 
-		let timeouts: NodeJS.Timeout[] = []
-
-		// Automatically approve if the ask according to the user's settings.
-		const provider = this.providerRef.deref()
-		const state = provider ? await provider.getState() : undefined
-		const approval = await checkAutoApproval({ state, ask: type, text, isProtected })
+		const timeouts: NodeJS.Timeout[] = []
 
 		if (approval.decision === "approve") {
 			this.approveAsk()
@@ -1253,7 +1325,10 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 						if (message) {
 							this.interactiveAsk = message
 							this.emit(RooCodeEventName.TaskInteractive, this.taskId)
-							provider?.postMessageToWebview({ type: "interactionRequired" })
+							/* v8 ignore next 3 -- fires inside 2s timer after ask() resolves; not reachable in unit tests */
+							void provider?.postMessageToWebview({ type: "interactionRequired" }).catch((error) => {
+								console.error("[Task#ask] postMessageToWebview interactionRequired failed:", error)
+							})
 						}
 					}, statusMutationTimeout),
 				)
@@ -1300,7 +1375,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		// Wait for askResponse to be set
 		await pWaitFor(
 			() => {
-				if (this.askResponse !== undefined || this.lastMessageTs !== askTs) {
+				if (this.abort || this.askResponse !== undefined || this.lastMessageTs !== askTs) {
 					return true
 				}
 
@@ -1324,6 +1399,11 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 			},
 			{ interval: 100 },
 		)
+
+		/* v8 ignore next 3 -- abort-while-waiting path; covered by e2e standalone-resume test */
+		if (this.abort) {
+			throw new Error(`[ZooCode#ask] task ${this.taskId}.${this.instanceId} aborted`)
+		}
 
 		if (this.lastMessageTs !== askTs) {
 			// Could happen if we send multiple asks in a row i.e. with
@@ -1393,7 +1473,9 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 			)
 			if (lastToolAskIndex !== -1) {
 				this.clineMessages[lastToolAskIndex].isAnswered = true
-				void this.updateClineMessage(this.clineMessages[lastToolAskIndex])
+				void this.updateClineMessage(this.clineMessages[lastToolAskIndex]).catch((error) => {
+					console.error("[Task#handleWebviewAskResponse] updateClineMessage failed:", error)
+				})
 				this.saveClineMessages().catch((error) => {
 					console.error("Failed to save answered tool-ask state:", error)
 				})
@@ -1536,6 +1618,11 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		const metadata: ApiHandlerCreateMessageMetadata = {
 			mode,
 			taskId: this.taskId,
+			...(this.currentRequestAbortController?.signal
+				? {
+						abortSignal: this.currentRequestAbortController.signal,
+					}
+				: {}),
 			...(allTools.length > 0
 				? {
 						tools: allTools,
@@ -1636,7 +1723,13 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 					lastMessage.images = images
 					lastMessage.partial = partial
 					lastMessage.progressStatus = progressStatus
-					this.updateClineMessage(lastMessage)
+					// Fire-and-forget: webview post is internally guarded, but the
+					// `RooCodeEventName.Message` emit can synchronously throw via a
+					// consumer-attached listener. Surface that as a log, not an
+					// unhandled rejection.
+					this.updateClineMessage(lastMessage).catch((error) => {
+						console.error("[Task#say] updateClineMessage failed:", error)
+					})
 				} else {
 					// This is a new partial message, so add it with partial state.
 					const sayTs = Date.now()
@@ -1675,7 +1768,11 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 					await this.saveClineMessages()
 
 					// More performant than an entire `postStateToWebview`.
-					this.updateClineMessage(lastMessage)
+					// Fire-and-forget: see updateClineMessage call above for the
+					// rationale on the .catch arm.
+					this.updateClineMessage(lastMessage).catch((error) => {
+						console.error("[Task#say] updateClineMessage failed:", error)
+					})
 				} else {
 					// This is a new and complete message, so add it like normal.
 					const sayTs = Date.now()
@@ -1723,9 +1820,13 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 	async sayAndCreateMissingParamError(toolName: ToolName, paramName: string, relPath?: string) {
 		await this.say(
 			"error",
-			`Roo tried to use ${toolName}${
-				relPath ? ` for '${relPath.toPosix()}'` : ""
-			} without value for required parameter '${paramName}'. Retrying...`,
+			relPath
+				? t("tools:missingToolParameterWithPath", {
+						toolName,
+						relPath: relPath.toPosix(),
+						paramName,
+					})
+				: t("tools:missingToolParameter", { toolName, paramName }),
 		)
 		return formatResponse.toolError(formatResponse.missingToolParameterError(paramName))
 	}
@@ -1767,13 +1868,10 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 	/**
 	 * Manually start a **new** task when it was created with `startTask: false`.
 	 *
-	 * This fires `startTask` as a background async operation for the
-	 * `task/images` code-path only.  It does **not** handle the
-	 * `historyItem` resume path (use the constructor with `startTask: true`
-	 * for that).  The primary use-case is in the delegation flow where the
-	 * parent's metadata must be persisted to globalState **before** the
-	 * child task begins writing its own history (avoiding a read-modify-write
-	 * race on globalState).
+	 * This fires task startup as a background async operation after the provider
+	 * has installed the task in the stack and wired listeners. The primary
+	 * use-case is delegation/rehydration flow where metadata and stack state
+	 * must be in place before the task begins writing history or emitting asks.
 	 */
 	public start(): void {
 		if (this._started) {
@@ -1784,8 +1882,35 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		const { task, images } = this.metadata
 
 		if (task || images) {
-			this.startTask(task ?? undefined, images ?? undefined)
+			void this.startTask(task ?? undefined, images ?? undefined).catch((error) => {
+				console.error("[Task#start] startTask failed:", error)
+			})
 		}
+	}
+
+	/**
+	 * Like `start()`, but returns the underlying promise so callers (e.g.
+	 * `TaskScheduler`) can await task completion and gate concurrency.
+	 * Idempotent: subsequent calls return the same in-flight promise.
+	 */
+	public run(): Promise<void> {
+		if (this._runPromise !== undefined) {
+			return this._runPromise
+		}
+		if (this._started) {
+			// Already launched via constructor or start() — no promise to return.
+			return Promise.resolve()
+		}
+		this._started = true
+
+		const { task, images } = this.metadata
+
+		this._runPromise = this._isHistoryTask
+			? this.resumeTaskFromHistory()
+			: task || images
+				? this.startTask(task ?? undefined, images ?? undefined)
+				: Promise.resolve()
+		return this._runPromise
 	}
 
 	private async startTask(task?: string, images?: string[]): Promise<void> {
@@ -1911,7 +2036,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 				.find((m) => !(m.ask === "resume_task" || m.ask === "resume_completed_task")) // Could be multiple resume tasks.
 
 			let askType: ClineAsk
-			if (lastClineMessage?.ask === "completion_result") {
+			if (this.initialStatus === "completed" || lastClineMessage?.ask === "completion_result") {
 				askType = "resume_completed_task"
 			} else {
 				askType = "resume_task"
@@ -1932,7 +2057,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 
 			// Make sure that the api conversation history can be resumed by the API,
 			// even if it goes out of sync with cline messages.
-			let existingApiConversationHistory: ApiMessage[] = await this.getSavedApiConversationHistory()
+			const existingApiConversationHistory: ApiMessage[] = await this.getSavedApiConversationHistory()
 
 			// Tool blocks are always preserved; native tool calling only.
 
@@ -2029,7 +2154,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 				throw new Error("Unexpected: No existing API conversation history")
 			}
 
-			let newUserContent: Anthropic.Messages.ContentBlockParam[] = [...modifiedOldUserContent]
+			const newUserContent: Anthropic.Messages.ContentBlockParam[] = [...modifiedOldUserContent]
 
 			const agoText = ((): string => {
 				const timestamp = lastClineMessage?.ts ?? Date.now()
@@ -2325,7 +2450,11 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 
 	private async initiateTaskLoop(userContent: Anthropic.Messages.ContentBlockParam[]): Promise<void> {
 		// Kicks off the checkpoints initialization process in the background.
-		getCheckpointService(this)
+		// `getCheckpointService` wraps its full body in a try/catch and returns
+		// `undefined` on failure (see src/core/checkpoints/index.ts), so the
+		// returned promise cannot reject. `void` is sufficient — no `.catch`
+		// arm needed.
+		void getCheckpointService(this)
 
 		let nextUserContent = userContent
 		let includeFileDetails = true
@@ -2432,12 +2561,12 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 			// This prevents the UI from showing an "API Request..." spinner while we are
 			// intentionally waiting due to the rate limit slider.
 			//
-			// NOTE: We also set Task.lastGlobalApiRequestTime here to reserve this slot
-			// before we build environment details (which can take time).
-			// This ensures subsequent requests (including subtasks) still honour the
+			// NOTE: We also record the request time here to reserve this slot before
+			// we build environment details (which can take time). This ensures
+			// subsequent requests (including subtasks) still honour the
 			// provider rate-limit window.
 			await this.maybeWaitForProviderRateLimit(currentItem.retryAttempt ?? 0)
-			Task.lastGlobalApiRequestTime = performance.now()
+			this.rateLimitClock.recordRequest()
 
 			await this.say(
 				"api_req_started",
@@ -2499,7 +2628,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 
 			// Add environment details as its own text block, separate from tool
 			// results.
-			let finalUserContent = [...contentWithoutEnvDetails, { type: "text" as const, text: environmentDetails }]
+			const finalUserContent = [...contentWithoutEnvDetails, { type: "text" as const, text: environmentDetails }]
 			// Only add user message to conversation history if:
 			// 1. This is the first attempt (retryAttempt === 0), AND
 			// 2. The original userContent was not empty (empty signals delegation resume where
@@ -2645,7 +2774,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 				const stream = this.attemptApiRequest(currentItem.retryAttempt ?? 0, { skipProviderRateLimit: true })
 				let assistantMessage = ""
 				let reasoningMessage = ""
-				let pendingGroundingSources: GroundingSource[] = []
+				const pendingGroundingSources: GroundingSource[] = []
 				this.isStreaming = true
 
 				try {
@@ -2662,9 +2791,13 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 								if (signal.aborted) {
 									reject(new Error("Request cancelled by user"))
 								} else {
-									signal.addEventListener("abort", () => {
-										reject(new Error("Request cancelled by user"))
-									})
+									signal.addEventListener(
+										"abort",
+										() => {
+											reject(new Error("Request cancelled by user"))
+										},
+										{ once: true },
+									)
 								}
 							})
 							return await Promise.race([nextPromise, abortPromise])
@@ -2768,7 +2901,8 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 										// Add to content and present
 										this.assistantMessageContent.push(partialToolUse)
 										this.userMessageContentReady = false
-										presentAssistantMessage(this)
+										/* v8 ignore next -- streaming presenter; .catch lives in presentAssistantMessageSafe (covered) */
+										this.presentAssistantMessageSafe()
 									} else if (event.type === "tool_call_delta") {
 										// Process chunk using streaming JSON parser
 										const partialToolUse = NativeToolCallParser.processStreamingChunk(
@@ -2787,7 +2921,8 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 												this.assistantMessageContent[toolUseIndex] = partialToolUse
 
 												// Present updated tool use
-												presentAssistantMessage(this)
+												/* v8 ignore next -- streaming presenter; .catch lives in presentAssistantMessageSafe (covered) */
+												this.presentAssistantMessageSafe()
 											}
 										}
 									} else if (event.type === "tool_call_end") {
@@ -2813,7 +2948,8 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 											this.userMessageContentReady = false
 
 											// Present the finalized tool call
-											presentAssistantMessage(this)
+											/* v8 ignore next -- streaming presenter; .catch lives in presentAssistantMessageSafe (covered) */
+											this.presentAssistantMessageSafe()
 										} else if (toolUseIndex !== undefined) {
 											// finalizeStreamingToolCall returned null (malformed JSON or missing args)
 											// Mark the tool as non-partial so it's presented as complete, but execution
@@ -2832,7 +2968,8 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 											this.userMessageContentReady = false
 
 											// Present the tool call - validation will handle missing params
-											presentAssistantMessage(this)
+											/* v8 ignore next -- streaming presenter; .catch lives in presentAssistantMessageSafe (covered) */
+											this.presentAssistantMessageSafe()
 										}
 									}
 								}
@@ -2865,7 +3002,8 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 
 								// Present the tool call to user - presentAssistantMessage will execute
 								// tools sequentially and accumulate all results in userMessageContent
-								presentAssistantMessage(this)
+								/* v8 ignore next -- streaming presenter; .catch lives in presentAssistantMessageSafe (covered) */
+								this.presentAssistantMessageSafe()
 								break
 							}
 							case "text": {
@@ -2884,7 +3022,8 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 									})
 									this.userMessageContentReady = false
 								}
-								presentAssistantMessage(this)
+								/* v8 ignore next -- streaming presenter; .catch lives in presentAssistantMessageSafe (covered) */
+								this.presentAssistantMessageSafe()
 								break
 							}
 						}
@@ -3211,7 +3350,8 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 							this.userMessageContentReady = false
 
 							// Present the finalized tool call
-							presentAssistantMessage(this)
+							/* v8 ignore next -- streaming presenter; .catch lives in presentAssistantMessageSafe (covered) */
+							this.presentAssistantMessageSafe()
 						} else if (toolUseIndex !== undefined) {
 							// finalizeStreamingToolCall returned null (malformed JSON or missing args)
 							// We still need to mark the tool as non-partial so it gets executed
@@ -3230,7 +3370,8 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 							this.userMessageContentReady = false
 
 							// Present the tool call - validation will handle missing params
-							presentAssistantMessage(this)
+							/* v8 ignore next -- streaming presenter; .catch lives in presentAssistantMessageSafe (covered) */
+							this.presentAssistantMessageSafe()
 						}
 					}
 				}
@@ -3429,7 +3570,8 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 					// If there is content to update then it will complete and
 					// update `this.userMessageContentReady` to true, which we
 					// `pWaitFor` before making the next request.
-					presentAssistantMessage(this)
+					/* v8 ignore next -- streaming presenter; .catch lives in presentAssistantMessageSafe (covered) */
+					this.presentAssistantMessageSafe()
 				}
 
 				if (hasTextContent || hasToolUses) {
@@ -3515,7 +3657,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 					// apiConversationHistory at line 1876. Since the assistant failed to respond,
 					// we need to remove that message before retrying to avoid having two consecutive
 					// user messages (which would cause tool_result validation errors).
-					let state = await this.providerRef.deref()?.getState()
+					const state = await this.providerRef.deref()?.getState()
 					if (this.apiConversationHistory.length > 0) {
 						const lastMessage = this.apiConversationHistory[this.apiConversationHistory.length - 1]
 						if (lastMessage.role === "user") {
@@ -3708,7 +3850,10 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 			settings: this.apiConfiguration,
 		})
 
-		const contextWindow = modelInfo.contextWindow
+		// vscode-lm condenses against its static-table maxInputTokens (not the inflated live window);
+		// only it implements getCondenseContextWindow, so others fall back to the full contextWindow.
+		const contextWindow = this.api.getCondenseContextWindow?.() ?? modelInfo.contextWindow
+		const useAvailableInputForContextPercent = typeof this.api.getCondenseContextWindow === "function"
 
 		// Get the current profile ID using the helper method
 		const currentProfileId = this.getCurrentProfileId(state)
@@ -3744,6 +3889,11 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		const metadata: ApiHandlerCreateMessageMetadata = {
 			mode,
 			taskId: this.taskId,
+			...(this.currentRequestAbortController?.signal
+				? {
+						abortSignal: this.currentRequestAbortController.signal,
+					}
+				: {}),
 			...(allTools.length > 0
 				? {
 						tools: allTools,
@@ -3772,6 +3922,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 				currentProfileId,
 				metadata,
 				environmentDetails,
+				useAvailableInputForContextPercent,
 			})
 
 			if (truncateResult.messages !== this.apiConversationHistory) {
@@ -3831,12 +3982,13 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		const rateLimitSeconds =
 			state?.apiConfiguration?.rateLimitSeconds ?? this.apiConfiguration?.rateLimitSeconds ?? 0
 
-		if (rateLimitSeconds <= 0 || !Task.lastGlobalApiRequestTime) {
+		const lastRequestTime = this.rateLimitClock.getLastRequestTime()
+		if (rateLimitSeconds <= 0 || !lastRequestTime) {
 			return
 		}
 
 		const now = performance.now()
-		const timeSinceLastRequest = now - Task.lastGlobalApiRequestTime
+		const timeSinceLastRequest = now - lastRequestTime
 		const rateLimitDelay = Math.ceil(
 			Math.min(rateLimitSeconds, Math.max(0, rateLimitSeconds * 1000 - timeSinceLastRequest) / 1000),
 		)
@@ -3884,7 +4036,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		// timestamp earlier to include the environment details build. We still set it
 		// here for direct callers (tests) and for the case where we didn't rate-limit
 		// in the caller.
-		Task.lastGlobalApiRequestTime = performance.now()
+		this.rateLimitClock.recordRequest()
 
 		const systemPrompt = await this.getSystemPrompt()
 		const { contextTokens } = this.getTokenUsage()
@@ -3898,7 +4050,10 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 				settings: this.apiConfiguration,
 			})
 
-			const contextWindow = modelInfo.contextWindow
+			// vscode-lm condenses against its static-table maxInputTokens (not the inflated live window);
+			// only it implements getCondenseContextWindow, so others fall back to the full contextWindow.
+			const contextWindow = this.api.getCondenseContextWindow?.() ?? modelInfo.contextWindow
+			const useAvailableInputForContextPercent = typeof this.api.getCondenseContextWindow === "function"
 
 			// Get the current profile ID using the helper method
 			const currentProfileId = this.getCurrentProfileId(state)
@@ -3923,6 +4078,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 				profileThresholds,
 				currentProfileId,
 				lastMessageTokens,
+				useAvailableInputForContextPercent,
 			})
 
 			// Send condenseTaskContextStarted BEFORE manageContext to show in-progress indicator
@@ -3959,6 +4115,11 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 			const contextMgmtMetadata: ApiHandlerCreateMessageMetadata = {
 				mode,
 				taskId: this.taskId,
+				...(this.currentRequestAbortController?.signal
+					? {
+							abortSignal: this.currentRequestAbortController.signal,
+						}
+					: {}),
 				...(contextMgmtTools.length > 0
 					? {
 							tools: contextMgmtTools,
@@ -4000,6 +4161,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 					filesReadByRoo: contextMgmtFilesReadByRoo,
 					cwd: this.cwd,
 					rooIgnoreController: this.rooIgnoreController,
+					useAvailableInputForContextPercent,
 				})
 				if (truncateResult.messages !== this.apiConversationHistory) {
 					await this.overwriteApiConversationHistory(truncateResult.messages)
@@ -4096,7 +4258,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		// but uses allowedFunctionNames to restrict which tools can be called.
 		// Other providers (Anthropic, OpenAI, etc.) don't support this feature yet,
 		// so they continue to receive only the filtered tools for the current mode.
-		const supportsAllowedFunctionNames = apiConfiguration?.apiProvider === "gemini"
+		const supportsAllowedFunctionNames = apiConfiguration?.apiProvider === providerIdentifiers.gemini
 
 		{
 			const provider = this.providerRef.deref()
@@ -4121,10 +4283,15 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 
 		const shouldIncludeTools = allTools.length > 0
 
+		// Create an AbortController to allow cancelling the request mid-stream
+		this.currentRequestAbortController = new AbortController()
+		const abortSignal = this.currentRequestAbortController.signal
+
 		const metadata: ApiHandlerCreateMessageMetadata = {
 			mode: mode,
 			taskId: this.taskId,
 			suppressPreviousResponseId: this.skipPrevResponseIdOnce,
+			abortSignal,
 			// Include tools whenever they are present.
 			...(shouldIncludeTools
 				? {
@@ -4137,10 +4304,6 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 					}
 				: {}),
 		}
-
-		// Create an AbortController to allow cancelling the request mid-stream
-		this.currentRequestAbortController = new AbortController()
-		const abortSignal = this.currentRequestAbortController.signal
 		// Reset the flag after using it
 		this.skipPrevResponseIdOnce = false
 
@@ -4153,10 +4316,14 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		const iterator = stream[Symbol.asyncIterator]()
 
 		// Set up abort handling - when the signal is aborted, clean up the controller reference
-		abortSignal.addEventListener("abort", () => {
-			console.log(`[Task#${this.taskId}.${this.instanceId}] AbortSignal triggered for current request`)
-			this.currentRequestAbortController = undefined
-		})
+		abortSignal.addEventListener(
+			"abort",
+			() => {
+				console.log(`[Task#${this.taskId}.${this.instanceId}] AbortSignal triggered for current request`)
+				this.currentRequestAbortController = undefined
+			},
+			{ once: true },
+		)
 
 		try {
 			// Awaiting first chunk to see if it will throw an error.
@@ -4168,9 +4335,13 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 				if (abortSignal.aborted) {
 					reject(new Error("Request cancelled by user"))
 				} else {
-					abortSignal.addEventListener("abort", () => {
-						reject(new Error("Request cancelled by user"))
-					})
+					abortSignal.addEventListener(
+						"abort",
+						() => {
+							reject(new Error("Request cancelled by user"))
+						},
+						{ once: true },
+					)
 				}
 			})
 
@@ -4179,8 +4350,11 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 			this.isWaitingForFirstChunk = false
 		} catch (error) {
 			this.isWaitingForFirstChunk = false
-			this.currentRequestAbortController = undefined
 			const isContextWindowExceededError = checkContextWindowExceededError(error)
+
+			if (!isContextWindowExceededError) {
+				this.currentRequestAbortController = undefined
+			}
 
 			// If it's a context window error and we haven't exceeded max retries for this error type
 			if (isContextWindowExceededError && retryAttempt < MAX_CONTEXT_WINDOW_RETRIES) {
@@ -4259,8 +4433,9 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 			// Respect provider rate limit window
 			let rateLimitDelay = 0
 			const rateLimit = (state?.apiConfiguration ?? this.apiConfiguration)?.rateLimitSeconds || 0
-			if (Task.lastGlobalApiRequestTime && rateLimit > 0) {
-				const elapsed = performance.now() - Task.lastGlobalApiRequestTime
+			const lastRequestTime = this.rateLimitClock.getLastRequestTime()
+			if (lastRequestTime && rateLimit > 0) {
+				const elapsed = performance.now() - lastRequestTime
 				rateLimitDelay = Math.ceil(Math.min(rateLimit, Math.max(0, rateLimit * 1000 - elapsed) / 1000))
 			}
 

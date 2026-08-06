@@ -43,17 +43,33 @@ vi.mock("../diagnosticsHandler", () => ({
 	generateErrorDiagnostics: vi.fn().mockResolvedValue({ success: true, filePath: "/tmp/diagnostics.json" }),
 }))
 
+vi.mock("../rulesMessageHandler", () => ({
+	handleRequestRules: vi.fn(),
+	handleCreateRule: vi.fn(),
+	handleDeleteRule: vi.fn(),
+	handleOpenRuleFile: vi.fn(),
+	handleOpenRulesDirectory: vi.fn(),
+}))
+
 import type { ModelRecord } from "@roo-code/types"
 
 import { webviewMessageHandler } from "../webviewMessageHandler"
 import type { ClineProvider } from "../ClineProvider"
-import { getModels } from "../../../api/providers/fetchers/modelCache"
+import { flushModels, getModels } from "../../../api/providers/fetchers/modelCache"
 import { getLMStudioModels } from "../../../api/providers/fetchers/lmstudio"
 import { getCommands } from "../../../services/command/commands"
+import {
+	handleCreateRule,
+	handleDeleteRule,
+	handleOpenRuleFile,
+	handleOpenRulesDirectory,
+	handleRequestRules,
+} from "../rulesMessageHandler"
 const { openAiCodexOAuthManager } = await import("../../../integrations/openai-codex/oauth")
 const { fetchOpenAiCodexRateLimitInfo } = await import("../../../integrations/openai-codex/rate-limits")
 
 const mockGetModels = getModels as Mock<typeof getModels>
+const mockFlushModels = flushModels as Mock<typeof flushModels>
 const mockGetLMStudioModels = getLMStudioModels as Mock<typeof getLMStudioModels>
 const mockGetCommands = vi.mocked(getCommands)
 const mockGetAccessToken = vi.mocked(openAiCodexOAuthManager.getAccessToken)
@@ -278,6 +294,9 @@ describe("webviewMessageHandler - image mentions", () => {
 describe("webviewMessageHandler - requestOllamaModels", () => {
 	beforeEach(() => {
 		vi.clearAllMocks()
+		mockFlushModels.mockReset()
+		mockFlushModels.mockResolvedValue(undefined)
+		mockGetModels.mockReset()
 		mockClineProvider.getState = vi.fn().mockResolvedValue({
 			apiConfiguration: {
 				ollamaModelId: "model-1",
@@ -309,6 +328,97 @@ describe("webviewMessageHandler - requestOllamaModels", () => {
 		})
 
 		expect(mockGetModels).toHaveBeenCalledWith({ provider: "ollama", baseUrl: "http://localhost:1234" })
+
+		expect(mockClineProvider.postMessageToWebview).toHaveBeenCalledWith({
+			type: "ollamaModels",
+			ollamaModels: mockModels,
+		})
+	})
+
+	it("posts empty models response when no models are found", async () => {
+		mockGetModels.mockResolvedValue({})
+
+		await webviewMessageHandler(mockClineProvider, {
+			type: "requestOllamaModels",
+		})
+
+		expect(mockClineProvider.postMessageToWebview).toHaveBeenCalledWith({
+			type: "ollamaModels",
+			ollamaModels: {},
+		})
+	})
+
+	it("posts empty models response with error message and logs to output on fetch failure", async () => {
+		mockGetModels.mockRejectedValue(new Error("Connection refused"))
+
+		await webviewMessageHandler(mockClineProvider, {
+			type: "requestOllamaModels",
+		})
+
+		expect(mockClineProvider.postMessageToWebview).toHaveBeenCalledWith({
+			type: "ollamaModels",
+			ollamaModels: {},
+			error: "Connection refused",
+		})
+
+		expect(mockClineProvider.log).toHaveBeenCalledWith(
+			"[requestOllamaModels] Failed to read models for http://localhost:1234: Connection refused",
+		)
+	})
+
+	it("distinguishes a model cache refresh failure from a model read failure", async () => {
+		mockFlushModels.mockRejectedValue(new Error("Cache write failed"))
+
+		await webviewMessageHandler(mockClineProvider, {
+			type: "requestOllamaModels",
+			values: { baseUrl: "https://ollama.example.com" },
+		})
+
+		expect(mockGetModels).not.toHaveBeenCalled()
+		expect(mockClineProvider.log).toHaveBeenCalledWith(
+			"[requestOllamaModels] Failed to refresh model cache for https://ollama.example.com: Cache write failed",
+		)
+		expect(mockClineProvider.postMessageToWebview).toHaveBeenCalledWith({
+			type: "ollamaModels",
+			ollamaModels: {},
+			error: "Cache write failed",
+		})
+	})
+
+	it("uses baseUrl from message values over saved state", async () => {
+		const mockModels: ModelRecord = {
+			"remote-model": {
+				maxTokens: 4096,
+				contextWindow: 8192,
+				supportsPromptCache: false,
+				description: "Remote model",
+			},
+		}
+
+		mockGetModels.mockResolvedValue(mockModels)
+
+		await webviewMessageHandler(mockClineProvider, {
+			type: "requestOllamaModels",
+			values: {
+				baseUrl: "https://ollama.example.com",
+				apiKey: "secret-key",
+			},
+		})
+
+		// Should use the URL from message values, not the saved state
+		expect(mockFlushModels).toHaveBeenCalledWith(
+			{
+				provider: "ollama",
+				baseUrl: "https://ollama.example.com",
+				apiKey: "secret-key",
+			},
+			true,
+		)
+		expect(mockGetModels).toHaveBeenCalledWith({
+			provider: "ollama",
+			baseUrl: "https://ollama.example.com",
+			apiKey: "secret-key",
+		})
 
 		expect(mockClineProvider.postMessageToWebview).toHaveBeenCalledWith({
 			type: "ollamaModels",
@@ -366,6 +476,10 @@ describe("webviewMessageHandler - requestRouterModels", () => {
 			apiKey: "litellm-key",
 			baseUrl: "http://localhost:4000",
 		})
+		// Opencode Go's /models endpoint is public, so it is fetched like the other no-auth routers.
+		expect(mockGetModels).toHaveBeenCalledWith(expect.objectContaining({ provider: "opencode-go" }))
+		// Kenari's /models endpoint is public, so it is fetched like the other no-auth routers.
+		expect(mockGetModels).toHaveBeenCalledWith(expect.objectContaining({ provider: "kenari" }))
 
 		// Verify response was sent
 		expect(mockClineProvider.postMessageToWebview).toHaveBeenCalledWith({
@@ -381,9 +495,109 @@ describe("webviewMessageHandler - requestRouterModels", () => {
 				lmstudio: {},
 				poe: {},
 				deepseek: {},
-				"opencode-go": {},
+				moonshot: {},
+				"opencode-go": mockModels,
+				kenari: mockModels,
+				"kimi-code": {},
 			},
 			values: undefined,
+		})
+	})
+
+	it("fetches Opencode Go models without an API key (public /models endpoint, regression for empty picker)", async () => {
+		mockClineProvider.getState = vi.fn().mockResolvedValue({
+			apiConfiguration: {
+				openRouterApiKey: "openrouter-key",
+				// Deliberately no opencodeGoApiKey — the endpoint is public.
+			},
+		})
+
+		const mockModels: ModelRecord = {
+			"glm-5.1": {
+				maxTokens: 4096,
+				contextWindow: 8192,
+				supportsPromptCache: false,
+				description: "GLM 5.1",
+			},
+		}
+		mockGetModels.mockResolvedValue(mockModels)
+
+		await webviewMessageHandler(mockClineProvider, { type: "requestRouterModels" })
+
+		// Must be fetched despite no configured key, forwarding apiKey: undefined.
+		expect(mockGetModels).toHaveBeenCalledWith({ provider: "opencode-go", apiKey: undefined })
+
+		const routerModelsCall = (mockClineProvider.postMessageToWebview as any).mock.calls.find(
+			([msg]: [{ type: string }]) => msg.type === "routerModels",
+		)
+		expect(routerModelsCall?.[0].routerModels["opencode-go"]).toEqual(mockModels)
+	})
+
+	it("flushes and fetches Opencode Go models when an explicit API key is supplied", async () => {
+		mockClineProvider.getState = vi.fn().mockResolvedValue({
+			apiConfiguration: {},
+		})
+		mockGetModels.mockResolvedValue({
+			"opencode/model": {
+				maxTokens: 4096,
+				contextWindow: 8192,
+				supportsPromptCache: false,
+				description: "Opencode model",
+			},
+		})
+
+		await webviewMessageHandler(mockClineProvider, {
+			type: "requestRouterModels",
+			values: {
+				provider: "opencode-go",
+				opencodeGoApiKey: "fresh-key",
+			},
+		})
+
+		expect(mockFlushModels).toHaveBeenCalledWith({ provider: "opencode-go", apiKey: "fresh-key" }, true)
+		expect(mockGetModels).toHaveBeenCalledWith({ provider: "opencode-go", apiKey: "fresh-key" })
+		expect(mockClineProvider.postMessageToWebview).toHaveBeenCalledWith({
+			type: "routerModels",
+			routerModels: {
+				"opencode-go": {
+					"opencode/model": expect.objectContaining({ description: "Opencode model" }),
+				},
+			},
+			values: { provider: "opencode-go" },
+		})
+	})
+
+	it("flushes and fetches Kenari models when an explicit API key is supplied", async () => {
+		mockClineProvider.getState = vi.fn().mockResolvedValue({
+			apiConfiguration: {},
+		})
+		mockGetModels.mockResolvedValue({
+			"glm-5-2": {
+				maxTokens: 32768,
+				contextWindow: 1048576,
+				supportsPromptCache: false,
+				description: "Kenari model",
+			},
+		})
+
+		await webviewMessageHandler(mockClineProvider, {
+			type: "requestRouterModels",
+			values: {
+				provider: "kenari",
+				kenariApiKey: "fresh-kenari-key",
+			},
+		})
+
+		expect(mockFlushModels).toHaveBeenCalledWith({ provider: "kenari", apiKey: "fresh-kenari-key" }, true)
+		expect(mockGetModels).toHaveBeenCalledWith({ provider: "kenari", apiKey: "fresh-kenari-key" })
+		expect(mockClineProvider.postMessageToWebview).toHaveBeenCalledWith({
+			type: "routerModels",
+			routerModels: {
+				kenari: {
+					"glm-5-2": expect.objectContaining({ description: "Kenari model" }),
+				},
+			},
+			values: { provider: "kenari" },
 		})
 	})
 
@@ -469,7 +683,10 @@ describe("webviewMessageHandler - requestRouterModels", () => {
 				lmstudio: {},
 				poe: {},
 				deepseek: {},
-				"opencode-go": {},
+				moonshot: {},
+				"opencode-go": mockModels,
+				kenari: mockModels,
+				"kimi-code": {},
 			},
 			values: undefined,
 		})
@@ -493,6 +710,7 @@ describe("webviewMessageHandler - requestRouterModels", () => {
 			.mockResolvedValueOnce(mockModels) // vercel-ai-gateway
 			.mockResolvedValueOnce(mockModels) // zoo-gateway
 			.mockRejectedValueOnce(new Error("LiteLLM connection failed")) // litellm
+			.mockResolvedValueOnce(mockModels) // opencode-go
 
 		await webviewMessageHandler(mockClineProvider, {
 			type: "requestRouterModels",
@@ -527,7 +745,10 @@ describe("webviewMessageHandler - requestRouterModels", () => {
 				lmstudio: {},
 				poe: {},
 				deepseek: {},
-				"opencode-go": {},
+				moonshot: {},
+				"opencode-go": mockModels,
+				kenari: mockModels,
+				"kimi-code": {},
 			},
 			values: undefined,
 		})
@@ -597,7 +818,7 @@ describe("webviewMessageHandler - requestRouterModels", () => {
 		})
 	})
 
-	it("prefers config values over message values for LiteLLM", async () => {
+	it("prefers message values over config values for LiteLLM", async () => {
 		const mockModels: ModelRecord = {}
 		mockGetModels.mockResolvedValue(mockModels)
 
@@ -609,11 +830,11 @@ describe("webviewMessageHandler - requestRouterModels", () => {
 			},
 		})
 
-		// Verify config values are used over message values
+		// Verify message values take precedence over saved config (current unsaved field state wins)
 		expect(mockGetModels).toHaveBeenCalledWith({
 			provider: "litellm",
-			apiKey: "litellm-key", // From config
-			baseUrl: "http://localhost:4000", // From config
+			apiKey: "message-key", // From message.values
+			baseUrl: "http://message-url", // From message.values
 		})
 	})
 })
@@ -1176,6 +1397,45 @@ describe("webviewMessageHandler - requestCommands", () => {
 	})
 })
 
+describe("webviewMessageHandler - rules", () => {
+	beforeEach(() => {
+		vi.clearAllMocks()
+		vi.mocked(mockClineProvider.getCurrentTask).mockReturnValue(undefined)
+		;(mockClineProvider as any).cwd = "/mock/workspace"
+	})
+
+	it("routes rules management messages with the current workspace", async () => {
+		const messages = [
+			{ type: "requestRules" },
+			{ type: "createRule", values: { scope: "project", kind: "generic", fileName: "new.md" } },
+			{ type: "deleteRule", values: { scope: "project", kind: "generic", relativePath: "old.md" } },
+			{ type: "openRuleFile", values: { scope: "global", kind: "generic", relativePath: "global.md" } },
+			{ type: "openRulesDirectory", values: { scope: "project", kind: "mode", modeSlug: "code" } },
+		] as const
+
+		for (const message of messages) {
+			await webviewMessageHandler(mockClineProvider, message as any)
+		}
+
+		expect(handleRequestRules).toHaveBeenCalledWith(mockClineProvider, "/mock/workspace")
+		expect(handleCreateRule).toHaveBeenCalledWith(mockClineProvider, "/mock/workspace", messages[1])
+		expect(handleDeleteRule).toHaveBeenCalledWith(mockClineProvider, "/mock/workspace", messages[2])
+		expect(handleOpenRuleFile).toHaveBeenCalledWith(mockClineProvider, "/mock/workspace", messages[3])
+		expect(handleOpenRulesDirectory).toHaveBeenCalledWith(mockClineProvider, "/mock/workspace", messages[4])
+	})
+
+	it("uses the active task cwd when routing rule messages", async () => {
+		vi.mocked(mockClineProvider.getCurrentTask).mockReturnValue({
+			cwd: "/mock/task-workspace",
+		} as unknown as ReturnType<ClineProvider["getCurrentTask"]>)
+
+		const message = { type: "requestRules" } as const
+		await webviewMessageHandler(mockClineProvider, message as any)
+
+		expect(handleRequestRules).toHaveBeenCalledWith(mockClineProvider, "/mock/task-workspace")
+	})
+})
+
 describe("webviewMessageHandler - downloadErrorDiagnostics", () => {
 	beforeEach(() => {
 		vi.clearAllMocks()
@@ -1235,7 +1495,7 @@ describe("zooCodeSignOut", () => {
 		vi.clearAllMocks()
 	})
 
-	it("disconnects Zoo Code and clears tokens from all zoo-gateway profiles", async () => {
+	it("disconnects Zoo Code and clears tokens from all Zoo Gateway profiles", async () => {
 		const { disconnectZooCode } = await import("../../../services/zoo-code-auth")
 		const upsertProviderProfile = vi.fn().mockResolvedValue(undefined)
 		const saveConfig = vi.fn().mockResolvedValue(undefined)
@@ -1305,5 +1565,150 @@ describe("zooCodeSignOut", () => {
 			expect.not.objectContaining({ zooSessionToken: expect.anything() }),
 			true,
 		)
+	})
+})
+
+describe("webviewMessageHandler - kimiCodeSignIn", () => {
+	beforeEach(() => {
+		vi.clearAllMocks()
+		vi.resetModules()
+	})
+
+	it("starts OAuth authorization and opens browser", async () => {
+		const mockStartAuthorization = vi.fn().mockResolvedValue({
+			userCode: "TEST-CODE",
+			verificationUri: "https://auth.kimi.com/device",
+			expiresAt: Date.now() + 600000,
+		})
+		const mockWaitForAuthorization = vi.fn().mockResolvedValue({
+			type: "kimi-code",
+			accessToken: "token",
+			refreshToken: "refresh",
+			expiresAt: Date.now() + 3600000,
+		})
+
+		vi.doMock("../../../integrations/kimi-code/oauth", () => ({
+			kimiCodeOAuthManager: {
+				startAuthorization: mockStartAuthorization,
+				waitForAuthorization: mockWaitForAuthorization,
+			},
+		}))
+
+		const mockOpenExternal = vi.fn().mockResolvedValue(true)
+		;(vscode as any).env = { openExternal: mockOpenExternal }
+		;(vscode as any).Uri = { parse: vi.fn((url: string) => url) }
+
+		await webviewMessageHandler(mockClineProvider, { type: "kimiCodeSignIn" })
+
+		expect(mockStartAuthorization).toHaveBeenCalled()
+		expect(mockOpenExternal).toHaveBeenCalled()
+		expect(mockClineProvider.postStateToWebview).toHaveBeenCalled()
+	})
+
+	it("shows success message after successful authorization", async () => {
+		const mockStartAuthorization = vi.fn().mockResolvedValue({
+			userCode: "TEST-CODE",
+			verificationUri: "https://auth.kimi.com/device",
+			expiresAt: Date.now() + 600000,
+		})
+		const mockWaitForAuthorization = vi.fn().mockResolvedValue({
+			type: "kimi-code",
+			accessToken: "token",
+			refreshToken: "refresh",
+			expiresAt: Date.now() + 3600000,
+		})
+
+		vi.doMock("../../../integrations/kimi-code/oauth", () => ({
+			kimiCodeOAuthManager: {
+				startAuthorization: mockStartAuthorization,
+				waitForAuthorization: mockWaitForAuthorization,
+			},
+		}))
+
+		const mockOpenExternal = vi.fn().mockResolvedValue(true)
+		;(vscode as any).env = { openExternal: mockOpenExternal }
+		;(vscode as any).Uri = { parse: vi.fn((url: string) => url) }
+
+		await webviewMessageHandler(mockClineProvider, { type: "kimiCodeSignIn" })
+		await new Promise((resolve) => setTimeout(resolve, 10))
+
+		expect(vscode.window.showInformationMessage).toHaveBeenCalledWith("Successfully signed in to Kimi Code")
+	})
+
+	it("handles authorization failure", async () => {
+		const mockStartAuthorization = vi.fn().mockResolvedValue({
+			userCode: "TEST-CODE",
+			verificationUri: "https://auth.kimi.com/device",
+			expiresAt: Date.now() + 600000,
+		})
+		const mockWaitForAuthorization = vi.fn().mockRejectedValue(new Error("Authorization cancelled"))
+
+		vi.doMock("../../../integrations/kimi-code/oauth", () => ({
+			kimiCodeOAuthManager: {
+				startAuthorization: mockStartAuthorization,
+				waitForAuthorization: mockWaitForAuthorization,
+			},
+		}))
+
+		const mockOpenExternal = vi.fn().mockResolvedValue(true)
+		;(vscode as any).env = { openExternal: mockOpenExternal }
+		;(vscode as any).Uri = { parse: vi.fn((url: string) => url) }
+
+		await webviewMessageHandler(mockClineProvider, { type: "kimiCodeSignIn" })
+		await new Promise((resolve) => setTimeout(resolve, 10))
+
+		expect(mockClineProvider.postStateToWebview).toHaveBeenCalled()
+	})
+
+	it("handles startAuthorization error", async () => {
+		const mockStartAuthorization = vi.fn().mockRejectedValue(new Error("Network error"))
+
+		vi.doMock("../../../integrations/kimi-code/oauth", () => ({
+			kimiCodeOAuthManager: {
+				startAuthorization: mockStartAuthorization,
+			},
+		}))
+
+		await webviewMessageHandler(mockClineProvider, { type: "kimiCodeSignIn" })
+
+		expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(expect.stringContaining("Kimi Code sign in failed"))
+		expect(mockClineProvider.postStateToWebview).toHaveBeenCalled()
+	})
+})
+
+describe("webviewMessageHandler - kimiCodeSignOut", () => {
+	beforeEach(() => {
+		vi.clearAllMocks()
+		vi.resetModules()
+	})
+
+	it("clears credentials and shows success message", async () => {
+		const mockClearCredentials = vi.fn().mockResolvedValue(undefined)
+
+		vi.doMock("../../../integrations/kimi-code/oauth", () => ({
+			kimiCodeOAuthManager: {
+				clearCredentials: mockClearCredentials,
+			},
+		}))
+
+		await webviewMessageHandler(mockClineProvider, { type: "kimiCodeSignOut" })
+
+		expect(mockClearCredentials).toHaveBeenCalled()
+		expect(vscode.window.showInformationMessage).toHaveBeenCalledWith("Signed out from Kimi Code")
+		expect(mockClineProvider.postStateToWebview).toHaveBeenCalled()
+	})
+
+	it("handles sign out error", async () => {
+		const mockClearCredentials = vi.fn().mockRejectedValue(new Error("Clear failed"))
+
+		vi.doMock("../../../integrations/kimi-code/oauth", () => ({
+			kimiCodeOAuthManager: {
+				clearCredentials: mockClearCredentials,
+			},
+		}))
+
+		await webviewMessageHandler(mockClineProvider, { type: "kimiCodeSignOut" })
+
+		expect(vscode.window.showErrorMessage).toHaveBeenCalledWith("Kimi Code sign out failed.")
 	})
 })
