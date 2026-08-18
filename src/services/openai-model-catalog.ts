@@ -27,7 +27,7 @@ import type { ClineProvider } from "../core/webview/ClineProvider"
 const CATALOG_URL_ENV_VAR = "ZOO_CODE_OPENAI_MODEL_CATALOG_URL"
 const CATALOG_BASE_URL_MATCH_ENV_VAR = "ZOO_CODE_OPENAI_MODEL_CATALOG_BASE_URL"
 const DEFAULT_CATALOG_URL = "https://plugins.ai.t-systems.net/external/.well-known/opencode"
-const DEFAULT_CATALOG_BASE_URL_MATCH = "https://llm-server.llmhub.t-systems.net/v2"
+const DEFAULT_CATALOG_BASE_URL_MATCH = "llm-server.llmhub.t-systems.net"
 const CATALOG_DESCRIPTION_SUFFIX = " (model catalog)"
 const CATALOG_FETCH_TIMEOUT_MS = 10_000
 const CATALOG_CACHE_TTL_SECONDS = 60 * 60
