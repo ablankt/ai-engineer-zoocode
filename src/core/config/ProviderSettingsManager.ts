@@ -18,6 +18,7 @@ import { TelemetryService } from "@roo-code/telemetry"
 
 import { Mode, modes } from "../../shared/modes"
 import { buildApiHandler } from "../../api"
+import { withOpenAiCatalogModelInfo } from "../../services/openai-model-catalog"
 import { downgradeLegacyRooConfig } from "./routerRemoval"
 
 // Type-safe model migrations mapping
@@ -379,7 +380,9 @@ export class ProviderSettingsManager {
 	 * Preserves the ID from the input 'config' object if it exists,
 	 * otherwise generates a new one (for creation scenarios).
 	 */
-	public async saveConfig(name: string, config: ProviderSettingsWithId): Promise<string> {
+	public async saveConfig(name: string, savedConfig: ProviderSettingsWithId): Promise<string> {
+		const config = await withOpenAiCatalogModelInfo(savedConfig)
+
 		try {
 			return await this.lock(async () => {
 				const providerProfiles = await this.load()
