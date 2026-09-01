@@ -21,6 +21,7 @@ import { inputEventTransform, noTransform } from "../transforms"
 import { ModelPicker } from "../ModelPicker"
 import { R1FormatSetting } from "../R1FormatSetting"
 import { ThinkingBudget } from "../ThinkingBudget"
+import { vscode } from "../../../utils/vscode"
 
 type OpenAICompatibleProps = {
 	apiConfiguration: ProviderSettings
@@ -121,6 +122,11 @@ export const OpenAICompatible = ({
 		}
 	}, [])
 
+	const handleModelChange = (modelId: string) => {
+		console.log("changed to modelId: ", modelId)
+		vscode.postMessage({ type: "updateAIFSModelConfig", text: modelId })
+	}
+
 	useEvent("message", onMessage)
 
 	return (
@@ -152,6 +158,7 @@ export const OpenAICompatible = ({
 				organizationAllowList={organizationAllowList}
 				errorMessage={modelValidationError}
 				simplifySettings={simplifySettings}
+				onModelChange={handleModelChange}
 			/>
 			<R1FormatSetting
 				onChange={handleInputChange("openAiR1FormatEnabled", noTransform)}

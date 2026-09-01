@@ -27,6 +27,8 @@ export interface ExtensionMessage {
 	type:
 		| "action"
 		| "state"
+		| "updateAIFSModelConfig"
+		| "updateAIFSModelConfig"
 		| "taskHistoryUpdated"
 		| "taskHistoryItemUpdated"
 		| "selectedImages"
@@ -631,6 +633,8 @@ export interface WebviewMessage {
 		| "deleteRule"
 		| "openRuleFile"
 		| "openRulesDirectory"
+		// AIFS model config
+		| "updateAIFSModelConfig"
 	text?: string
 	taskId?: string
 	editedMessageContent?: string

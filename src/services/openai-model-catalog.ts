@@ -240,6 +240,9 @@ function isReplaceable(info: ModelInfo | null | undefined): boolean {
  * previously catalog-provisioned info (identified by the description suffix) get replaced.
  */
 export async function withOpenAiCatalogModelInfo<T extends ProviderSettings>(settings: T): Promise<T> {
+	console.log("called withOpenAiCatalogModelInfo ...")
+	console.log("settings.openAiModelId in withOpenAiCatalogModelInfo: ", settings.openAiModelId)
+
 	try {
 		if (settings.apiProvider !== providerIdentifiers.openai || !settings.openAiModelId) {
 			return settings
@@ -271,16 +274,22 @@ export async function withOpenAiCatalogModelInfo<T extends ProviderSettings>(set
  * configured before the catalog was available and are not otherwise touched again.
  */
 export async function syncOpenAiCatalogProfiles(provider: ClineProvider): Promise<void> {
+	console.log("Called syncOpenAiCatalogProfiles...")
+
 	if (!getOpenAiModelCatalogUrl()) {
 		return
 	}
 
 	const activeProfileName = provider.contextProxy.getValues().currentApiConfigName
+	console.log("activeProfileName: ", activeProfileName)
 	const entries = await provider.providerSettingsManager.listConfig()
 
 	for (const entry of entries.filter(({ apiProvider }) => apiProvider === providerIdentifiers.openai)) {
 		const profile = await provider.providerSettingsManager.getProfile({ name: entry.name })
 		const updated = await withOpenAiCatalogModelInfo(profile)
+
+		console.log("profile in syncOpenAiCatalogProfiles: ", profile)
+		console.log("updated profile: ", updated)
 
 		if (updated === profile) {
 			continue
@@ -291,6 +300,50 @@ export async function syncOpenAiCatalogProfiles(provider: ClineProvider): Promis
 			// pick up the refreshed capabilities without a reload.
 			await provider.upsertProviderProfile(entry.name, updated, true)
 		} else {
+			await provider.providerSettingsManager.saveConfig(entry.name, updated)
+		}
+	}
+}
+/**
+ * Fetch the model info when user changes model from the dropdown under OpenAI comapotible.tsx
+ *
+ */
+
+export async function fetchOpenAiCatalogInfoOnModelChange(
+	provider: ClineProvider,
+	selectedModelId: string | undefined,
+): Promise<void> {
+	console.log("Called syncOpenAiCatalogProfiles...")
+
+	if (!getOpenAiModelCatalogUrl()) {
+		return
+	}
+
+	const activeProfileName = provider.contextProxy.getValues().currentApiConfigName
+	console.log("activeProfileName: ", activeProfileName)
+	const entries = await provider.providerSettingsManager.listConfig()
+
+	for (const entry of entries.filter(({ apiProvider }) => apiProvider === providerIdentifiers.openai)) {
+		let profile = await provider.providerSettingsManager.getProfile({ name: entry.name })
+		// Manually update the model in profile here as it is only updated user clicks on save and webview is refreshed which leads to old provider info in the context which in turns shows outdated model catalog info
+		profile.openAiModelId = selectedModelId
+
+		const updated = await withOpenAiCatalogModelInfo(profile)
+
+		console.log("profile in syncOpenAiCatalogProfiles: ", profile)
+		console.log("updated profile: ", updated)
+
+		// if (updated === profile) {
+		// 	continue
+		// }
+
+		if (entry.name === activeProfileName) {
+			console.log("equal to active profile...")
+			// Route the active profile through upsert so the in-memory settings and the webview
+			// pick up the refreshed capabilities without a reload.
+			await provider.upsertProviderProfile(entry.name, updated, true)
+		} else {
+			console.log("not equal to active profile...")
 			await provider.providerSettingsManager.saveConfig(entry.name, updated)
 		}
 	}

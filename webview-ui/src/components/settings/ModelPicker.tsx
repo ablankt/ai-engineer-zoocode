@@ -98,6 +98,8 @@ export const ModelPicker = ({
 
 	const { id: selectedModelId, info: selectedModelInfo } = useSelectedModel(apiConfiguration)
 
+	console.log("selectedModelInfo in ModelPicker.tsx: ", selectedModelInfo)
+
 	// Get the display value for the current selection
 	// If displayTransform is provided, use it to convert the stored value to a display string
 	const displayValue = useMemo(() => {
@@ -177,6 +179,8 @@ export const ModelPicker = ({
 			// Clear the search value when closing instead of prefilling it
 			closeTimeoutRef.current = setTimeout(() => setSearchValue(""), 100)
 		}
+
+		//FOR AIE: Emit an event to send a messafe ti webview handler
 	}, [])
 
 	const onClearSearch = useCallback(() => {
