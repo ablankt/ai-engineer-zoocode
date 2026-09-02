@@ -4065,14 +4065,17 @@ export const webviewMessageHandler = async (
 
 		case "updateAIFSModelConfig": {
 			const selectedModelId = message.text
-			console.log("message from webview: ", message.text)
-			console.log("UPDATE THE MODEL CONFIG FROM WEBVIEW!")
 
-			void fetchOpenAiCatalogInfoOnModelChange(provider, selectedModelId).catch((error) =>
-				console.log(
+			// Await the catalog fetch so the resolved model info is posted to the
+			// webview after it's ready, not before. The previous `void` form raced
+			// postStateToWebview ahead of the fetch, pushing stale capabilities.
+			try {
+				await fetchOpenAiCatalogInfoOnModelChange(provider, selectedModelId)
+			} catch (error) {
+				provider.log(
 					`[ModelCatalog] Error during profile sync: ${error instanceof Error ? error.message : String(error)}`,
-				),
-			)
+				)
+			}
 
 			await provider.postStateToWebview()
 

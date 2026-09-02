@@ -110,23 +110,37 @@ export const OpenAICompatible = ({
 		[setApiConfigurationField],
 	)
 
-	const onMessage = useCallback((event: MessageEvent) => {
-		const message: ExtensionMessage = event.data
+	const onMessage = useCallback(
+		(event: MessageEvent) => {
+			const message: ExtensionMessage = event.data
 
-		switch (message.type) {
-			case "openAiModels": {
-				const updatedModels = message.openAiModels ?? []
-				setOpenAiModels(Object.fromEntries(updatedModels.map((item) => [item, openAiModelInfoSaneDefaults])))
-				break
+			switch (message.type) {
+				case "openAiModels": {
+					const updatedModels = message.openAiModels ?? []
+					setOpenAiModels(
+						Object.fromEntries(updatedModels.map((item) => [item, openAiModelInfoSaneDefaults])),
+					)
+					break
+				}
+				case "openAiCatalogModelInfo": {
+					// Backend resolved the model capabilities from the catalog after a model
+					// change. Merge them into cachedState (not extensionState) so ModelInfoView
+					// and useSelectedModel update immediately without a reload, and so the
+					// next Save persists the resolved info. isUserAction=false avoids marking
+					// the form dirty for an automatic, backend-driven update.
+					if (message.modelInfo) {
+						setApiConfigurationField("openAiCustomModelInfo", message.modelInfo, false)
+					}
+					break
+				}
 			}
-		}
-	}, [])
+		},
+		[setApiConfigurationField],
+	)
 
 	const handleModelChange = (modelId: string) => {
-		console.log("changed to modelId: ", modelId)
 		vscode.postMessage({ type: "updateAIFSModelConfig", text: modelId })
 	}
-
 	useEvent("message", onMessage)
 
 	return (

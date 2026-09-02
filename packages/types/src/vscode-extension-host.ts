@@ -12,7 +12,7 @@ import type { CloudUserInfo, CloudOrganizationMembership, OrganizationAllowList,
 import type { SerializedCustomToolDefinition } from "./custom-tool.js"
 import type { GitCommit } from "./git.js"
 import type { McpServer } from "./mcp.js"
-import type { ModelRecord, RouterModels } from "./model.js"
+import type { ModelInfo, ModelRecord, RouterModels } from "./model.js"
 import type { OpenAiCodexRateLimitInfo } from "./providers/openai-codex-rate-limits.js"
 import type { SkillMetadata } from "./skills.js"
 import type { RuleMetadata } from "./rules.js"
@@ -27,8 +27,7 @@ export interface ExtensionMessage {
 	type:
 		| "action"
 		| "state"
-		| "updateAIFSModelConfig"
-		| "updateAIFSModelConfig"
+		| "openAiCatalogModelInfo"
 		| "taskHistoryUpdated"
 		| "taskHistoryItemUpdated"
 		| "selectedImages"
@@ -108,6 +107,8 @@ export interface ExtensionMessage {
 	text?: string
 	/** For fileContent: { path, content, error? } */
 	fileContent?: { path: string; content: string | null; error?: string }
+	/** For openAiCatalogModelInfo: resolved model capabilities from the catalog. */
+	modelInfo?: ModelInfo
 	payload?: any // eslint-disable-line @typescript-eslint/no-explicit-any
 	checkpointWarning?: {
 		type: "WAIT_TIMEOUT" | "INIT_TIMEOUT"
