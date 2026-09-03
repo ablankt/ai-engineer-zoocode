@@ -317,34 +317,33 @@ export async function fetchOpenAiCatalogInfoOnModelChange(
 		return
 	}
 
+	if (!selectedModelId) {
+		return
+	}
+
+	// Preview only: resolve the catalog capabilities for the newly selected model and
+	// push them to the webview so the form can show them in ModelInfoView. This must NOT
+	// persist anything to disk or update the in-memory profile — the user may still
+	// abandon the change. Persistence happens only when the user clicks Save, which
+	// sends cachedState.apiConfiguration (including this previewed info) through
+	// upsertApiConfiguration → upsertProviderProfile → saveConfig.
 	const activeProfileName = provider.contextProxy.getValues().currentApiConfigName
-	const entries = await provider.providerSettingsManager.listConfig()
+	if (!activeProfileName) {
+		return
+	}
 
-	for (const entry of entries.filter(({ apiProvider }) => apiProvider === providerIdentifiers.openai)) {
-		const profile = await provider.providerSettingsManager.getProfile({ name: entry.name })
-		// The profile on disk still holds the previous model id (Save hasn't run yet), so
-		// override it with the newly selected id before resolving catalog capabilities —
-		// otherwise the catalog lookup uses the stale id and returns outdated info.
-		profile.openAiModelId = selectedModelId
+	const profile = await provider.providerSettingsManager.getProfile({ name: activeProfileName })
+	// The profile on disk still holds the previous model id (Save hasn't run yet), so
+	// override it with the newly selected id before resolving catalog capabilities —
+	// otherwise the catalog lookup uses the stale id and returns outdated info.
+	profile.openAiModelId = selectedModelId
 
-		const updated = await withOpenAiCatalogModelInfo(profile)
+	const updated = await withOpenAiCatalogModelInfo(profile)
 
-		if (entry.name === activeProfileName) {
-			// Route the active profile through upsert so the in-memory settings and the webview
-			// pick up the refreshed capabilities without a reload.
-			await provider.upsertProviderProfile(entry.name, updated, true)
-			// Push the resolved capabilities to the webview so the form (which reads from
-			// cachedState, isolated from extensionState per AGENTS.md) can merge them in
-			// and update ModelInfoView without a reload. This also ensures the next Save
-			// persists the resolved info, since handleSubmit sends cachedState.apiConfiguration.
-			if (updated.openAiCustomModelInfo) {
-				await provider.postMessageToWebview({
-					type: "openAiCatalogModelInfo",
-					modelInfo: updated.openAiCustomModelInfo,
-				})
-			}
-		} else {
-			await provider.providerSettingsManager.saveConfig(entry.name, updated)
-		}
+	if (updated.openAiCustomModelInfo) {
+		await provider.postMessageToWebview({
+			type: "openAiCatalogModelInfo",
+			modelInfo: updated.openAiCustomModelInfo,
+		})
 	}
 }
