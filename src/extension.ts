@@ -36,6 +36,7 @@ import { kimiCodeOAuthManager } from "./integrations/kimi-code/oauth"
 import { McpServerManager } from "./services/mcp/McpServerManager"
 import { CodeIndexManager } from "./services/code-index/manager"
 import { MdmService } from "./services/mdm/MdmService"
+import { syncOpenAiCatalogProfiles } from "./services/openai-model-catalog"
 import { migrateSettings } from "./utils/migrateSettings"
 import { autoImportSettings } from "./utils/autoImportSettings"
 import { API } from "./extension/api"
@@ -262,6 +263,13 @@ export async function activate(context: vscode.ExtensionContext) {
 			`[AutoImport] Error during auto-import: ${error instanceof Error ? error.message : String(error)}`,
 		)
 	}
+
+	// Refresh OpenAI-Compatible model capabilities from the configured model catalog.
+	void syncOpenAiCatalogProfiles(provider).catch((error) =>
+		outputChannel.appendLine(
+			`[ModelCatalog] Error during profile sync: ${error instanceof Error ? error.message : String(error)}`,
+		),
+	)
 
 	registerCommands({ context, outputChannel, provider })
 

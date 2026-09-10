@@ -177,6 +177,8 @@ export const ModelPicker = ({
 			// Clear the search value when closing instead of prefilling it
 			closeTimeoutRef.current = setTimeout(() => setSearchValue(""), 100)
 		}
+
+		//FOR AIE: Emit an event to send a messafe ti webview handler
 	}, [])
 
 	const onClearSearch = useCallback(() => {

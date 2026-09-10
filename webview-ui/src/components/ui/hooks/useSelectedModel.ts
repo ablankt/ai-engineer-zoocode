@@ -112,6 +112,9 @@ export const useSelectedModel = (apiConfiguration?: ProviderSettings) => {
 					}
 				: { id: getProviderDefaultModelId(activeProvider ?? "openrouter"), info: undefined }
 
+	console.log("provider in useSelectedModel: ", JSON.stringify(provider))
+	console.log("info in useSelectedModel: ", JSON.stringify(info))
+
 	return {
 		provider,
 		id,

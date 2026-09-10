@@ -5,6 +5,7 @@ import * as fs from "fs/promises"
 import { getRooDirectoriesForCwd } from "../../services/roo-config/index.js"
 import pWaitFor from "p-wait-for"
 import * as vscode from "vscode"
+import { syncOpenAiCatalogProfiles, fetchOpenAiCatalogInfoOnModelChange } from "../../services/openai-model-catalog"
 
 import {
 	type Language,
@@ -4058,6 +4059,25 @@ export const webviewMessageHandler = async (
 				const errorMessage = error instanceof Error ? error.message : String(error)
 				provider.log(`Error opening folder picker: ${errorMessage}`)
 			}
+
+			break
+		}
+
+		case "updateAIFSModelConfig": {
+			const selectedModelId = message.text
+
+			// Await the catalog fetch so the resolved model info is posted to the
+			// webview after it's ready, not before. The previous `void` form raced
+			// postStateToWebview ahead of the fetch, pushing stale capabilities.
+			try {
+				await fetchOpenAiCatalogInfoOnModelChange(provider, selectedModelId)
+			} catch (error) {
+				provider.log(
+					`[ModelCatalog] Error during profile sync: ${error instanceof Error ? error.message : String(error)}`,
+				)
+			}
+
+			await provider.postStateToWebview()
 
 			break
 		}

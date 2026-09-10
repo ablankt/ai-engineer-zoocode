@@ -1676,6 +1676,7 @@ export class ClineProvider
 		activate: boolean = true,
 	): Promise<string | undefined> {
 		try {
+			console.log("updated provider settings in ClineProvider: ", providerSettings)
 			// TODO: Do we need to be calling `activateProfile`? It's not
 			// clear to me what the source of truth should be; in some cases
 			// we rely on the `ContextProxy`'s data store and in other cases
@@ -1684,6 +1685,7 @@ export class ClineProvider
 			const id = await this.providerSettingsManager.saveConfig(name, providerSettings)
 
 			if (activate) {
+				console.log("inside if in upsertProviderProfile... ")
 				const { mode } = await this.getState()
 
 				// These promises do the following:
@@ -1710,7 +1712,14 @@ export class ClineProvider
 
 				// Keep the current task's sticky provider profile in sync with the newly-activated profile.
 				await this.persistStickyProviderProfileToCurrentTask(name)
+
+				console.log(
+					"this.providerSettingsManager state: ",
+					await this.providerSettingsManager.getProfile({ name: "default" }),
+				)
+				console.log("this.contextProxy: ", await this.contextProxy.getProviderSettings())
 			} else {
+				console.log("inside else in upsertProviderProfile... ")
 				await this.updateGlobalState("listApiConfigMeta", await this.providerSettingsManager.listConfig())
 			}
 
@@ -2473,6 +2482,8 @@ export class ClineProvider
 		} catch {
 			// Keep the default unauthenticated state if the optional Zoo Code auth service is unavailable.
 		}
+
+		console.log("api Config is post state to webview: ", apiConfiguration)
 
 		return {
 			version: this.context.extension?.packageJSON?.version ?? "",
