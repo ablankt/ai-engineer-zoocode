@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: 2026 Deutsche Telekom AG
+#
+# SPDX-License-Identifier: CC0-1.0
+
+# See https://reuse.software/spec-3.2/#reusetoml for specification
+version = 1
+SPDX-PackageName = "Zoo-Code"
+SPDX-PackageSupplier = "Deutsche Telekom AG <opensource@telekom.de>"
+SPDX-PackageDownloadLocation = "https://github.com/ablankt/ai-engineer-zoocode"
+
+# This repository is a fork of https://github.com/Zoo-Code-Org/Zoo-Code .
+# The upstream project does not use per-file REUSE headers. Its licensing is
+# declared here for the whole tree. "aggregate" precedence keeps any licensing
+# information that individual upstream files already carry (e.g. vendored
+# third-party code with its own SPDX header) and adds the upstream declaration.
+# Files added or modified by Deutsche Telekom AG carry their own SPDX header.
+[[annotations]]
+path = ["**"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = ["2026 Zoo Code Org"]
+SPDX-License-Identifier = "Apache-2.0"
