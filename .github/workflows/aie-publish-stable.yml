@@ -1,0 +1,43 @@
+name: AIE Publish Stable VSIX
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish-stable:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          install-args: "--frozen-lockfile"
+
+      - name: Build VSIX
+        run: |
+          pnpm vsix
+          ls -la bin/
+
+      - name: Determine version
+        id: version
+        run: |
+          VERSION=$(node -p "require('./src/package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ steps.version.outputs.version }}-aie-test"
+
+          gh release create "$TAG" \
+            --title "AIE ${TAG}" \
+            --notes "Temporary migration validation release" \
+            --target "$GITHUB_SHA" \
+            bin/*.vsix
