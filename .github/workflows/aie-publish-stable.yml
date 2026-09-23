@@ -1,7 +1,11 @@
 name: AIE Publish Stable VSIX
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - aie-gitlab-migration
+
+    workflow_dispatch:
 
 permissions:
   contents: write
